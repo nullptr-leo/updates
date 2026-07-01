@@ -4,9 +4,7 @@ import re
 import shutil
 import subprocess
 import tempfile
-from distutils.dir_util import copy_tree
 
-import requests
 import updater
 
 # proxy
@@ -27,9 +25,8 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-ffmpeg_pipe = subprocess.Popen(['ffmpeg', '-version'], stdout=subprocess.PIPE)
-ffmpeg_pipe.wait()
-local_info = ffmpeg_pipe.stdout.readlines()[0].decode('utf8')
+result = subprocess.run(['ffmpeg', '-version'], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+local_info = result.stdout.decode('utf8').splitlines()[0]
 local_version = re.search(r'version N-[^-]*-[^-]*-([^ ]*)', local_info, flags=re.M).group(1)
 print('Local version: %s' % local_version)
 
@@ -49,7 +46,7 @@ updater.taskkill('ffmpeg.exe')
 updater.extract_archive(winrar_exec, download_path, temp_dir)
 os.remove(download_path)
 deflate_path = glob.glob(os.path.join(temp_dir, 'ffmpeg-*'))[0]
-copy_tree(deflate_path, ffmpeg_path)
+shutil.copytree(deflate_path, ffmpeg_path, dirs_exist_ok=True)
 shutil.rmtree(temp_dir)
 
 updater.finish()

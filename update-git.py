@@ -2,7 +2,6 @@ import os
 import re
 import tempfile
 
-import requests
 import updater
 
 # proxy

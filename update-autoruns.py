@@ -3,7 +3,6 @@ import re
 import shutil
 import tempfile
 
-import requests
 import updater
 
 # find out the utilities executable path

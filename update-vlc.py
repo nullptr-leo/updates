@@ -4,9 +4,7 @@ import re
 import shutil
 import time
 import tempfile
-from distutils.dir_util import copy_tree
 
-import requests
 import updater
 
 # find out the utilities executable path
@@ -42,7 +40,7 @@ if updater.is_latest(remote_version, local_version) and remote_date <= local_dat
 # download package files
 print('Preparing...')
 temp_dir = tempfile.mkdtemp()
-download_path = os.path.join(temp_dir, remote_version + '.exe')
+download_path = os.path.join(temp_dir, remote_version + '.7z')
 updater.download(remote_url, download_path)
 
 # extract and update files
@@ -51,7 +49,7 @@ updater.extract_archive(winrar_exec, download_path, temp_dir)
 os.remove(download_path)
 deflate_path = glob.glob(os.path.join(temp_dir, 'vlc-*'))[0]
 shutil.rmtree(vlc_dir)
-copy_tree(deflate_path, vlc_dir)
+shutil.copytree(deflate_path, vlc_dir, dirs_exist_ok=True)
 shutil.rmtree(temp_dir)
 
 updater.finish()

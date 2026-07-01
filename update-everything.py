@@ -2,9 +2,7 @@ import os
 import re
 import shutil
 import tempfile
-from distutils.dir_util import copy_tree
 
-import requests
 import updater
 
 # find out the utilities executable path
@@ -43,7 +41,7 @@ updater.download(remote_url, download_path)
 updater.taskkill('Everything.exe')
 updater.extract_archive(winrar_exec, download_path, temp_dir)
 os.remove(download_path)
-copy_tree(temp_dir, everything_path)
+shutil.copytree(temp_dir, everything_path, dirs_exist_ok=True)
 shutil.rmtree(temp_dir)
 
 updater.finish()

@@ -3,9 +3,7 @@ import os
 import re
 import shutil
 import tempfile
-from distutils.dir_util import copy_tree
 
-import requests
 import updater
 
 # proxy
@@ -44,7 +42,7 @@ updater.taskkill('Flow.Launcher.exe')
 updater.extract_archive(winrar_exec, download_path, temp_dir)
 os.remove(download_path)
 deflate_path = glob.glob(os.path.join(temp_dir, 'FlowLauncher'))[0]
-copy_tree(deflate_path, flowlauncher_path)
+shutil.copytree(deflate_path, flowlauncher_path, dirs_exist_ok=True)
 shutil.rmtree(temp_dir)
 
 updater.finish()
