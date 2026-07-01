@@ -11,6 +11,8 @@ import win32api as win
 import urllib3
 from packaging import version
 
+from winrt.windows.management.deployment import PackageManager
+
 urllib3.disable_warnings()
 
 # Directories to search for installed software
@@ -19,6 +21,7 @@ SEARCH_PATHS = [
     'C:\\Program Files (x86)',
     'D:\\Program Files',
     'E:\\Program Files',
+    'C:\\Program Files\\WindowsApps',
     'C:\\Users\\Leo\\AppData\\Local\\Programs',
 ]
 
@@ -55,6 +58,24 @@ def get_file_version_parts(exe_path):
 def get_file_version(exe_path):
     """Get the file version string (a.b.c.d) of an executable."""
     return '%d.%d.%d.%d' % get_file_version_parts(exe_path)
+
+
+def get_appx_version(package_name):
+    """Get the version of a Windows AppX package by its package name.
+
+    package_name is the package name (e.g. 'Microsoft.WindowsTerminal').
+    Returns the version string 'major.minor.build.revision'.
+    """
+    try:
+        pm = PackageManager()
+        for package in pm.find_packages():
+            if package.id.name == package_name:
+                v = package.id.version
+                return '%d.%d.%d.%d' % (v.major, v.minor, v.build, v.revision)
+    except Exception:
+        fail_and_exit()
+    print(f'{package_name} not found.')
+    sys.exit(1)
 
 
 def test_proxy(proxy, enable_test=False):

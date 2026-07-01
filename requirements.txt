@@ -1,0 +1,4 @@
+winrt-runtime
+winrt-Windows.Foundation.Collections
+winrt-Windows.Management.Deployment
+winrt-Windows.ApplicationModel
