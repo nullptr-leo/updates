@@ -38,8 +38,6 @@ def find_scripts():
     scripts = []
     for path in glob.glob(os.path.join(SCRIPT_DIR, 'update-*.py')):
         base = os.path.basename(path)
-        if base == 'update_gui.py':
-            continue
         scripts.append((base, path))
     scripts.sort(key=lambda x: x[0])
     return scripts
@@ -63,6 +61,8 @@ class ScriptTask:
         self.fail_reason = ''
         self.last_emitted_pct = None
         self.seen_download = False
+        self.local_version = ''
+        self.remote_version = ''
 
     def run(self, msg_queue):
         try:
@@ -118,6 +118,16 @@ class ScriptTask:
         seg = seg.strip()
         if not seg:
             return
+        m_remote = re.search(r'Remote version:\s*(.*)', seg)
+        m_local = re.search(r'Local version:\s*(.*)', seg)
+        if m_remote:
+            self.remote_version = m_remote.group(1).strip()
+            self._emit(msg_queue, S_QUERYING, '')
+            return
+        if m_local:
+            self.local_version = m_local.group(1).strip()
+            self._emit(msg_queue, S_QUERYING, '')
+            return
         if 'Querying' in seg:
             self._emit(msg_queue, S_QUERYING, '')
         elif 'Already latest' in seg:
@@ -167,6 +177,8 @@ class ScriptTask:
             'status': status,
             'progress': progress,
             'reason': reason,
+            'local_version': self.local_version,
+            'remote_version': self.remote_version,
             'done': done,
         })
 
@@ -182,8 +194,9 @@ class App:
     def __init__(self, root):
         self.root = root
         root.title('Update Scripts')
-        root.geometry('660x540')
-        root.minsize(520, 320)
+        root.geometry('860x540')
+        root.minsize(680, 320)
+        self._center_window(root)
 
         self.msg_queue = queue.Queue()
         self.tasks = {}
@@ -202,12 +215,16 @@ class App:
         # --- list ---
         body = ttk.Frame(root)
         body.pack(fill='both', expand=True, padx=10, pady=(0, 10))
-        columns = ('name', 'status')
+        columns = ('name', 'local', 'remote', 'status')
         self.tree = ttk.Treeview(body, columns=columns, show='headings', selectmode='browse')
         self.tree.heading('name', text='脚本')
+        self.tree.heading('local', text='本地版本')
+        self.tree.heading('remote', text='远程版本')
         self.tree.heading('status', text='状态')
-        self.tree.column('name', width=200, anchor='w')
-        self.tree.column('status', width=280, anchor='center')
+        self.tree.column('name', width=160, anchor='w')
+        self.tree.column('local', width=110, anchor='center')
+        self.tree.column('remote', width=110, anchor='center')
+        self.tree.column('status', width=260, anchor='center')
         vsb = ttk.Scrollbar(body, orient='vertical', command=self.tree.yview)
         self.tree.configure(yscrollcommand=vsb.set)
         self.tree.pack(side='left', fill='both', expand=True)
@@ -224,10 +241,22 @@ class App:
         self._populate()
         root.protocol('WM_DELETE_WINDOW', self._on_close)
 
+    @staticmethod
+    def _center_window(root):
+        root.update_idletasks()
+        w = root.winfo_width()
+        h = root.winfo_height()
+        sw = root.winfo_screenwidth()
+        sh = root.winfo_screenheight()
+        x = (sw - w) // 2
+        y = (sh - h) // 2
+        root.geometry('%dx%d+%d+%d' % (w, h, x, y))
+
     def _populate(self):
         self.scripts = find_scripts()
         for base, _ in self.scripts:
-            self.tree.insert('', 'end', values=(pretty_name(base), S_WAITING), tags=('idle',))
+            self.tree.insert('', 'end', values=(pretty_name(base), '', '', S_WAITING),
+                             tags=('idle',))
         self.total = len(self.scripts)
         self.summary.config(text='共 %d 个脚本' % self.total if self.total else '无脚本')
 
@@ -244,7 +273,8 @@ class App:
             return 'idle'
         return 'running'
 
-    def _set_row(self, name, status, progress, tag, reason=''):
+    def _set_row(self, name, status, progress, tag, reason='',
+                 local_version='', remote_version=''):
         if status in (S_FAILED, S_SKIPPED) and reason:
             display = '%s: %s' % (status, reason)
         else:
@@ -252,7 +282,8 @@ class App:
         for item in self.tree.get_children(''):
             vals = self.tree.item(item, 'values')
             if vals[0] == name:
-                self.tree.item(item, values=(name, display), tags=(tag,))
+                self.tree.item(item, values=(name, local_version, remote_version, display),
+                               tags=(tag,))
                 if tag == 'running':
                     self.tree.see(item)
                 return
@@ -263,7 +294,7 @@ class App:
         # reset all rows
         for item in self.tree.get_children(''):
             cur = self.tree.item(item, 'values')
-            self.tree.item(item, values=(cur[0], S_WAITING), tags=('idle',))
+            self.tree.item(item, values=(cur[0], '', '', S_WAITING), tags=('idle',))
 
         self.running = True
         self.completed = 0
@@ -286,7 +317,8 @@ class App:
                 msg = self.msg_queue.get_nowait()
                 tag = self._tag_for(msg['status'])
                 self._set_row(msg['name'], msg['status'], msg.get('progress', ''),
-                              tag, msg.get('reason', ''))
+                              tag, msg.get('reason', ''),
+                              msg.get('local_version', ''), msg.get('remote_version', ''))
                 if msg.get('done'):
                     self.completed += 1
         except queue.Empty:
