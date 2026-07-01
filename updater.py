@@ -112,6 +112,16 @@ def run_installer(installer_path):
     subprocess.call([installer_path])
 
 
+def open_url(url):
+    """Open a URL in the default browser."""
+    os.startfile(url)
+
+
+def open_explorer(path):
+    """Open File Explorer and navigate to the given directory."""
+    subprocess.Popen(['explorer', path])
+
+
 def is_latest(remote_ver, local_ver):
     """Return True if the local version is up to date (version.parse comparison)."""
     return version.parse(remote_ver) <= version.parse(local_ver)
