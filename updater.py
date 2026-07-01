@@ -2,12 +2,9 @@
 import os
 import sys
 import time
-import shutil
-import tempfile
 import traceback
 import subprocess
 from contextlib import closing
-from distutils.dir_util import copy_tree
 
 import requests
 import win32api as win
@@ -36,12 +33,7 @@ def find_install_dir(folder_name):
 
 def find_winrar():
     """Find the WinRAR executable path."""
-    for prog_path in SEARCH_PATHS:
-        path = os.path.join(prog_path, 'WinRAR', 'WinRAR.exe')
-        if os.path.exists(path):
-            return path
-    print('WinRAR not found.')
-    sys.exit(1)
+    return os.path.join(find_install_dir('WinRAR'), 'WinRAR.exe')
 
 
 def fail_and_exit():
@@ -52,18 +44,16 @@ def fail_and_exit():
     sys.exit(1)
 
 
-def get_file_version(exe_path):
-    """Get the file version string (a.b.c.d) of an executable."""
-    info = win.GetFileVersionInfo(exe_path, os.sep)
-    ms, ls = info['FileVersionMS'], info['FileVersionLS']
-    return '%d.%d.%d.%d' % (win.HIWORD(ms), win.LOWORD(ms), win.HIWORD(ls), win.LOWORD(ls))
-
-
 def get_file_version_parts(exe_path):
     """Return (HIWORD(ms), LOWORD(ms), HIWORD(ls), LOWORD(ls)) for custom formatting."""
     info = win.GetFileVersionInfo(exe_path, os.sep)
     ms, ls = info['FileVersionMS'], info['FileVersionLS']
     return win.HIWORD(ms), win.LOWORD(ms), win.HIWORD(ls), win.LOWORD(ls)
+
+
+def get_file_version(exe_path):
+    """Get the file version string (a.b.c.d) of an executable."""
+    return '%d.%d.%d.%d' % get_file_version_parts(exe_path)
 
 
 def test_proxy(proxy, enable_test=False):
@@ -90,22 +80,25 @@ def download(url, dest_path, proxy=None):
     """Download a file with a progress indicator."""
     with closing(requests.get(url, stream=True, proxies={'https': proxy, 'http': proxy} if proxy else None)) as response:
         chunk_size = 1024
-        content_size = int(response.headers['content-length'])
+        content_size = int(response.headers.get('content-length', 0))
         data_count = 0
         with open(dest_path, 'wb') as f:
             for data in response.iter_content(chunk_size=chunk_size):
                 f.write(data)
                 data_count += len(data)
-                progress = (data_count / content_size) * 100
-                print('Download: %.2fMB (%.2f%%)' % (data_count / 1024 / 1024, progress), end='\r')
+                if content_size:
+                    progress = (data_count / content_size) * 100
+                    print('Download: %.2fMB (%.2f%%)' % (data_count / 1024 / 1024, progress), end='\r')
+                else:
+                    print('Download: %.2fMB' % (data_count / 1024 / 1024), end='\r')
 
 
 def taskkill(image_name):
     """Kill a running process by image name."""
     subprocess.call(
         ['taskkill', '/F', '/IM', image_name],
-        stdout=open('NUL', 'w'),
-        stderr=subprocess.STDOUT,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
 
 
