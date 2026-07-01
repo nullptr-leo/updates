@@ -1,11 +1,4 @@
-update-everything.py
-update-ffmpeg.py
-update-flowlauncher.py
-update-git.py
-update-notepad.py
-update-python.py
-update-trafficmonitor.py
-update-vlc.py
+for %%f in (update-*.py) do (%%f)
 
 python -m pip install -U pip
 pip install -U setuptools packaging requests pywin32
