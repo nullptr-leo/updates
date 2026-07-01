@@ -1,91 +1,54 @@
 import glob
-import re
 import os
-import requests
+import re
 import shutil
-import time
-import win32api as win
 import subprocess
 import tempfile
-import traceback
-
-from contextlib import closing
 from distutils.dir_util import copy_tree
-from packaging import version
 
-# update channel
-channel = 'shared'
-requests.packages.urllib3.disable_warnings()
+import requests
+import updater
 
 # find out the utilities executable path
-prog_lists = [ 'C:\\Program Files', 'D:\\Program Files', 'E:\\Program Files' ]
-for prog_path in prog_lists:
-    if 'ffmpeg_path' not in locals().keys():
-        if os.path.exists(os.path.join(prog_path, 'ffmpeg')):
-            ffmpeg_path = os.path.join(prog_path, 'ffmpeg')
-    if 'winrar_exec' not in locals().keys():
-        if os.path.exists(os.path.join(prog_path, 'WinRAR')):
-            winrar_exec = os.path.join(prog_path, 'WinRAR\\WinRAR.exe')
-
+ffmpeg_path = updater.find_install_dir('ffmpeg')
+winrar_exec = updater.find_winrar()
 print(ffmpeg_path)
 print(winrar_exec)
 
-# query the server edge version
+# query the remote version
 print('Querying...')
-
 try:
     response = requests.get('https://github.com/BtbN/FFmpeg-Builds/releases/latest')
     remote_info = re.search(r'Auto-Build (\(*)(\d*)-(\d*)-(\d*)', response.text, flags=re.M)
     remote_version = remote_info.group(2) + remote_info.group(3) + remote_info.group(4)
-except:
-    print('Query failed.')
-    traceback.print_exc()
-    os.system('pause')
-    exit()
-
+except Exception:
+    updater.fail_and_exit()
 print('Remote version: %s' % remote_version)
 
-# query the local edge version
+# query the local version
 ffmpeg_pipe = subprocess.Popen(['ffmpeg', '-version'], stdout=subprocess.PIPE)
 ffmpeg_pipe.wait()
 local_info = ffmpeg_pipe.stdout.readlines()[0].decode('utf8')
-local_info = re.search(r'version N-[^-]*-[^-]*-([^ ]*)', local_info, flags=re.M)
-local_version = local_info.group(1)
+local_version = re.search(r'version N-[^-]*-[^-]*-([^ ]*)', local_info, flags=re.M).group(1)
 print('Local version: %s' % local_version)
 
 # check if update is needed
-if version.parse(remote_version) <= version.parse(local_version):
-    print('Already latest.')
-    time.sleep(0.5)
-    exit()
-
-# get the package download url
-print('Preparing...')
+if updater.is_latest(remote_version, local_version):
+    updater.already_latest()
 
 # download package files
+print('Preparing...')
 remote_url = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip'
 temp_dir = tempfile.mkdtemp()
 download_path = os.path.join(temp_dir, remote_version + '.zip')
-with closing(requests.get(remote_url, stream=True)) as response:
-    chunk_size = 1024
-    content_size = int(response.headers['content-length'])
-    data_count = 0
-    with open(download_path, 'wb') as dload_file:
-        for data in response.iter_content(chunk_size=chunk_size):
-            dload_file.write(data)
-            data_count = data_count + len(data)
-            progress = (data_count / content_size) * 100
-            line = 'Download: %.2fMB (%.2f%%)' % (data_count / 1024 / 1024, progress)
-            print(line, end='\r')
+updater.download(remote_url, download_path)
 
 # extract and update files
-subprocess.call(['taskkill', '/F', '/IM', 'ffmpeg.exe'], stdout=open('NUL', 'w'), stderr=subprocess.STDOUT)
-subprocess.call([winrar_exec, 'x', '-o+-', '-inul', download_path, temp_dir])
+updater.taskkill('ffmpeg.exe')
+updater.extract_archive(winrar_exec, download_path, temp_dir)
 os.remove(download_path)
-
 deflate_path = glob.glob(os.path.join(temp_dir, 'ffmpeg-*'))[0]
 copy_tree(deflate_path, ffmpeg_path)
 shutil.rmtree(temp_dir)
 
-print('Finished.')
-time.sleep(0.5)
+updater.finish()
