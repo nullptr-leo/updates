@@ -8,9 +8,10 @@ from contextlib import closing
 
 import requests
 import win32api as win
+import urllib3
 from packaging import version
 
-requests.packages.urllib3.disable_warnings()
+urllib3.disable_warnings()
 
 # Directories to search for installed software
 SEARCH_PATHS = [
