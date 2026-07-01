@@ -95,7 +95,7 @@ def get_redirected_url(url, headers=None, proxy=None):
 def download(url, dest_path, proxy=None):
     """Download a file with a progress indicator."""
     with closing(requests.get(url, stream=True, proxies={'https': proxy, 'http': proxy} if proxy else None)) as response:
-        chunk_size = 1024
+        chunk_size = 65536  # 64KB
         content_size = int(response.headers.get('content-length', 0))
         data_count = 0
         with open(dest_path, 'wb') as f:
