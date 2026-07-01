@@ -26,7 +26,7 @@ local_version = updater.get_file_version(os.path.join(insta360_path, 'Insta360 S
 print('Local version: %s' % local_version)
 
 # check if update is needed
-if updater.is_latest_str(remote_version, local_version):
+if updater.is_latest(remote_version, local_version):
     updater.already_latest()
 
 # download package files
