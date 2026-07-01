@@ -36,6 +36,7 @@ download_path = os.path.join(temp_dir, remote_version + '.exe')
 updater.download(remote_url, download_path, proxy=proxy)
 
 # extract and update files
+updater.taskkill('git-cmd.exe')
 updater.run_installer(download_path)
 os.remove(download_path)
 

@@ -29,6 +29,7 @@ if updater.is_latest(remote_version, local_version):
 
 # navigate to download the update
 print('Preparing...')
+updater.taskkill('BCompare.exe')
 updater.open_url('https://www.ghxi.com/beyondcompare.html')
 updater.open_explorer(bcompare_path)
 
