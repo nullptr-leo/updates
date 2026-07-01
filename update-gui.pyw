@@ -25,7 +25,7 @@ S_PREPARING = '准备中'
 S_DOWNLOADING = '下载中'
 S_INSTALLING = '安装中'
 S_UPTODATE = '已是最新'
-S_SKIPPED = '跳过'
+S_SKIPPED = '未安装'
 S_DONE = '完成'
 S_FAILED = '失败'
 
@@ -221,7 +221,7 @@ class App:
         body.pack(fill='both', expand=True, padx=10, pady=(0, 10))
         columns = ('name', 'local', 'remote', 'status')
         self.tree = ttk.Treeview(body, columns=columns, show='headings', selectmode='browse')
-        self.tree.heading('name', text='脚本')
+        self.tree.heading('name', text='软件名称')
         self.tree.heading('local', text='本地版本')
         self.tree.heading('remote', text='远程版本')
         self.tree.heading('status', text='状态')
@@ -262,7 +262,7 @@ class App:
             self.tree.insert('', 'end', values=(pretty_name(base), '', '', S_WAITING),
                              tags=('idle',))
         self.total = len(self.scripts)
-        self.summary.config(text='共 %d 个脚本' % self.total if self.total else '无脚本')
+        self.summary.config(text='共 %d 个软件' % self.total if self.total else '无软件')
 
     def _tag_for(self, status):
         if status == S_DONE:
