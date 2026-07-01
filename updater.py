@@ -19,8 +19,8 @@ SEARCH_PATHS = [
     'C:\\Program Files (x86)',
     'D:\\Program Files',
     'E:\\Program Files',
+    'C:\\Users\\Leo\\AppData\\Local\\Programs',
 ]
-
 
 def find_install_dir(folder_name):
     """Find an installed software directory by folder name."""
