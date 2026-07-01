@@ -71,7 +71,8 @@ def test_proxy(proxy, enable_test=False):
 def query(url, headers=None, proxy=None):
     """Query a URL and return the response text."""
     try:
-        response = requests.get(url, headers=headers, proxies={'https': proxy} if proxy else None)
+        response = requests.get(url, headers=headers, proxies={'https': proxy} if proxy else None, timeout=30)
+        response.raise_for_status()
         return response.text
     except Exception:
         fail_and_exit()
@@ -94,7 +95,8 @@ def get_redirected_url(url, headers=None, proxy=None):
 
 def download(url, dest_path, proxy=None):
     """Download a file with a progress indicator."""
-    with closing(requests.get(url, stream=True, proxies={'https': proxy, 'http': proxy} if proxy else None)) as response:
+    with closing(requests.get(url, stream=True, proxies={'https': proxy, 'http': proxy} if proxy else None, timeout=30)) as response:
+        response.raise_for_status()
         chunk_size = 65536  # 64KB
         content_size = int(response.headers.get('content-length', 0))
         data_count = 0
