@@ -198,6 +198,10 @@ class App:
         root.minsize(680, 320)
         self._center_window(root)
 
+        # window icon
+        ico_path = os.path.join(SCRIPT_DIR, 'update.ico')
+        root.iconbitmap(default=ico_path)
+
         self.msg_queue = queue.Queue()
         self.tasks = {}
         self.running = False
