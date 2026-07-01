@@ -42,7 +42,7 @@ def fail_and_exit():
     print('Query failed.')
     traceback.print_exc()
     os.system('pause')
-    sys.exit(1)
+    sys.exit(2)
 
 
 def get_file_version_parts(exe_path):

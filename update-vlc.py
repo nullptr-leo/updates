@@ -7,6 +7,9 @@ import tempfile
 
 import updater
 
+# proxy
+proxy = updater.test_proxy('socks5h://127.0.0.1:7890')
+
 # find out the utilities executable path
 vlc_dir = updater.find_install_dir('VLC')
 winrar_exec = updater.find_winrar()
@@ -15,10 +18,10 @@ winrar_exec = updater.find_winrar()
 print('Querying...')
 try:
     remote_url = 'https://artifacts.videolan.org/vlc-3.0/nightly-win64/'
-    response = updater.query(remote_url)
+    response = updater.query(remote_url, proxy=proxy)
     remote_date = re.search(r'(\d{8}-\d{4})', response, flags=re.M | re.I).group(1)
     remote_url += remote_date + '/'
-    response = updater.query(remote_url)
+    response = updater.query(remote_url, proxy=proxy)
     remote_info = re.search(r'([^"]*\.7z)', response, flags=re.M | re.I).group(1)
     remote_url += remote_info
     remote_version = remote_info.split('-')[1]
@@ -41,7 +44,7 @@ if updater.is_latest(remote_version, local_version) and remote_date <= local_dat
 print('Preparing...')
 temp_dir = tempfile.mkdtemp()
 download_path = os.path.join(temp_dir, remote_version + '.7z')
-updater.download(remote_url, download_path)
+updater.download(remote_url, download_path, proxy=proxy)
 
 # extract and update files
 updater.taskkill('vlc.exe')
