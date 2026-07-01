@@ -8,17 +8,18 @@ from distutils.dir_util import copy_tree
 import requests
 import updater
 
+# proxy
+proxy = updater.test_proxy('socks5h://127.0.0.1:7890')
+
 # find out the utilities executable path
 flowlauncher_path = updater.find_install_dir('FlowLauncher')
 winrar_exec = updater.find_winrar()
-print(flowlauncher_path)
-print(winrar_exec)
 
 # query the remote version
 print('Querying...')
 try:
-    response = requests.get('https://github.com/Flow-Launcher/Flow.Launcher/releases/latest')
-    remote_version = re.search(r'Release v([\d\.]*)', response.text, flags=re.M).group(1)
+    response = updater.query('https://github.com/Flow-Launcher/Flow.Launcher/releases/latest', proxy=proxy)
+    remote_version = re.search(r'Release v([\d\.]*)', response, flags=re.M).group(1)
 except Exception:
     updater.fail_and_exit()
 print('Remote version: %s' % remote_version)
@@ -36,7 +37,7 @@ print('Preparing...')
 remote_url = 'https://github.com/Flow-Launcher/Flow.Launcher/releases/download/v' + remote_version + '/Flow-Launcher-Portable.zip'
 temp_dir = tempfile.mkdtemp()
 download_path = os.path.join(temp_dir, remote_version + '.zip')
-updater.download(remote_url, download_path)
+updater.download(remote_url, download_path, proxy=proxy)
 
 # extract and update files
 updater.taskkill('Flow.Launcher.exe')

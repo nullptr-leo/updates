@@ -8,17 +8,18 @@ from distutils.dir_util import copy_tree
 import requests
 import updater
 
+# proxy
+proxy = updater.test_proxy('socks5h://127.0.0.1:7890')
+
 # find out the utilities executable path
 trafficmonitor_path = updater.find_install_dir('Traffic Monitor')
 winrar_exec = updater.find_winrar()
-print(trafficmonitor_path)
-print(winrar_exec)
 
 # query the remote version
 print('Querying...')
 try:
-    response = requests.get('https://github.com/zhongyang219/TrafficMonitor/releases/latest')
-    remote_version = re.search(r'V([\d\.]*)', response.text, flags=re.M).group(1)
+    response = updater.query('https://github.com/zhongyang219/TrafficMonitor/releases/latest', proxy=proxy)
+    remote_version = re.search(r'V([\d\.]*)', response, flags=re.M).group(1)
 except Exception:
     updater.fail_and_exit()
 print('Remote version: %s' % remote_version)
@@ -37,7 +38,7 @@ print('Preparing...')
 remote_url = 'https://github.com/zhongyang219/TrafficMonitor/releases/download/V' + remote_version + '/TrafficMonitor_V' + remote_version + '_x64.zip'
 temp_dir = tempfile.mkdtemp()
 download_path = os.path.join(temp_dir, remote_version + '.zip')
-updater.download(remote_url, download_path)
+updater.download(remote_url, download_path, proxy=proxy)
 
 # extract and update files
 updater.taskkill('TrafficMonitor.exe')

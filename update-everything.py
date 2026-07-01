@@ -10,17 +10,16 @@ import updater
 # find out the utilities executable path
 everything_path = updater.find_install_dir('Everything')
 winrar_exec = updater.find_winrar()
-print(everything_path)
-print(winrar_exec)
 
 # query the remote version
 print('Querying...')
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
 }
+
 try:
-    response = requests.get('https://www.voidtools.com/forum/viewtopic.php?t=9787', headers=headers)
-    remote_version = re.search(r'Everything\-([\d\.]*)', response.text, flags=re.M).group(1)
+    response = updater.query('https://www.voidtools.com/forum/viewtopic.php?t=9787', headers=headers)
+    remote_version = re.search(r'Everything\-([\d\.]*)', response, flags=re.M).group(1)
 except Exception:
     updater.fail_and_exit()
 print('Remote version: %s' % remote_version)

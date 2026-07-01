@@ -5,17 +5,18 @@ import tempfile
 import requests
 import updater
 
+# proxy
+proxy = updater.test_proxy('socks5h://127.0.0.1:7890')
+
 # find out the utilities executable path
 python_path = updater.find_install_dir('Python')
 winrar_exec = updater.find_winrar()
-print(python_path)
-print(winrar_exec)
 
 # query the remote version
 print('Querying...')
 try:
-    response = requests.get('https://www.python.org/downloads/')
-    remote_version = re.search(r'python-(.*)-amd64.exe', response.text, flags=re.M | re.I).group(1)
+    response = updater.query('https://www.python.org/downloads/', proxy=proxy)
+    remote_version = re.search(r'python-(.*)-amd64.exe', response, flags=re.M | re.I).group(1)
 except Exception:
     updater.fail_and_exit()
 print('Remote version: %s' % remote_version)
@@ -33,10 +34,9 @@ print('Preparing...')
 remote_url = 'https://www.python.org/ftp/python/' + remote_version + '/python-' + remote_version + '-amd64.exe'
 temp_dir = tempfile.mkdtemp()
 download_path = os.path.join(temp_dir, remote_version + '.exe')
-updater.download(remote_url, download_path)
+updater.download(remote_url, download_path, proxy=proxy)
 
 # extract and update files
-updater.taskkill('python.exe')
 updater.run_installer(download_path)
 os.remove(download_path)
 

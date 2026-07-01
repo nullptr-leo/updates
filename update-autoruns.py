@@ -9,16 +9,14 @@ import updater
 # find out the utilities executable path
 autorun_path = updater.find_install_dir('Autoruns')
 winrar_exec = updater.find_winrar()
-print(autorun_path)
-print(winrar_exec)
 
 # query the remote version
 print('Querying...')
 try:
-    response = requests.get('https://learn.microsoft.com/zh-cn/sysinternals/downloads/autoruns')
-    remote_info = re.search(r'Autoruns v([^< ]*)', response.text, flags=re.M | re.I)
+    response = updater.query('https://learn.microsoft.com/zh-cn/sysinternals/downloads/autoruns')
+    remote_info = re.search(r'Autoruns v([^< ]*)', response, flags=re.M | re.I)
     if not remote_info:
-        remote_info = re.search(r'Windows v([^< ]*)', response.text, flags=re.M | re.I)
+        remote_info = re.search(r'Windows v([^< ]*)', response, flags=re.M | re.I)
     remote_version = remote_info.group(1)
 except Exception:
     updater.fail_and_exit()

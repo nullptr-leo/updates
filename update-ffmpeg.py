@@ -9,17 +9,18 @@ from distutils.dir_util import copy_tree
 import requests
 import updater
 
+# proxy
+proxy = updater.test_proxy('socks5h://127.0.0.1:7890')
+
 # find out the utilities executable path
 ffmpeg_path = updater.find_install_dir('ffmpeg')
 winrar_exec = updater.find_winrar()
-print(ffmpeg_path)
-print(winrar_exec)
 
 # query the remote version
 print('Querying...')
 try:
-    response = requests.get('https://github.com/BtbN/FFmpeg-Builds/releases/latest')
-    remote_info = re.search(r'Auto-Build (\(*)(\d*)-(\d*)-(\d*)', response.text, flags=re.M)
+    response = updater.query('https://github.com/BtbN/FFmpeg-Builds/releases/latest', proxy=proxy)
+    remote_info = re.search(r'Auto-Build (\(*)(\d*)-(\d*)-(\d*)', response, flags=re.M)
     remote_version = remote_info.group(2) + remote_info.group(3) + remote_info.group(4)
 except Exception:
     updater.fail_and_exit()
@@ -41,7 +42,7 @@ print('Preparing...')
 remote_url = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip'
 temp_dir = tempfile.mkdtemp()
 download_path = os.path.join(temp_dir, remote_version + '.zip')
-updater.download(remote_url, download_path)
+updater.download(remote_url, download_path, proxy=proxy)
 
 # extract and update files
 updater.taskkill('ffmpeg.exe')

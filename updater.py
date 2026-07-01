@@ -30,7 +30,8 @@ def find_install_dir(folder_name):
         path = os.path.join(prog_path, folder_name)
         if os.path.exists(path):
             return path
-    return None
+    print(f'{folder_name} not found.')
+    sys.exit(1)
 
 
 def find_winrar():
@@ -39,7 +40,8 @@ def find_winrar():
         path = os.path.join(prog_path, 'WinRAR', 'WinRAR.exe')
         if os.path.exists(path):
             return path
-    return None
+    print('WinRAR not found.')
+    sys.exit(1)
 
 
 def fail_and_exit():
@@ -64,9 +66,29 @@ def get_file_version_parts(exe_path):
     return win.HIWORD(ms), win.LOWORD(ms), win.HIWORD(ls), win.LOWORD(ls)
 
 
-def download(url, dest_path):
+def test_proxy(proxy, enable_test=False):
+    """Test if a proxy is working by querying a known URL."""
+    if not enable_test:
+        return proxy
+    try:
+        response = requests.get('https://www.google.com/', proxies={'https': proxy})
+        return proxy if response.status_code == 200 else None
+    except Exception:
+        return None
+
+
+def query(url, headers=None, proxy=None):
+    """Query a URL and return the response text."""
+    try:
+        response = requests.get(url, headers=headers, proxies={'https': proxy} if proxy else None)
+        return response.text
+    except Exception:
+        fail_and_exit()
+
+
+def download(url, dest_path, proxy=None):
     """Download a file with a progress indicator."""
-    with closing(requests.get(url, stream=True)) as response:
+    with closing(requests.get(url, stream=True, proxies={'https': proxy, 'http': proxy} if proxy else None)) as response:
         chunk_size = 1024
         content_size = int(response.headers['content-length'])
         data_count = 0
@@ -115,4 +137,4 @@ def already_latest():
 
 def finish():
     print('Finished.')
-    time.sleep(0.5)
+    time.sleep(0.3)
