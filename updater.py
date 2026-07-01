@@ -76,6 +76,21 @@ def query(url, headers=None, proxy=None):
         fail_and_exit()
 
 
+def get_redirected_url(url, headers=None, proxy=None):
+    """Return the final URL after following redirects, without downloading content."""
+    proxies = {'https': proxy, 'http': proxy} if proxy else None
+    try:
+        response = requests.head(url, headers=headers, proxies=proxies, allow_redirects=True)
+        if response.status_code < 400:
+            return response.url
+        # Fallback: some servers reject HEAD, use stream GET and close immediately
+        response = requests.get(url, headers=headers, proxies=proxies, stream=True, allow_redirects=True)
+        response.close()
+        return response.url
+    except Exception:
+        fail_and_exit()
+
+
 def download(url, dest_path, proxy=None):
     """Download a file with a progress indicator."""
     with closing(requests.get(url, stream=True, proxies={'https': proxy, 'http': proxy} if proxy else None)) as response:
@@ -120,6 +135,11 @@ def open_url(url):
 def open_explorer(path):
     """Open File Explorer and navigate to the given directory."""
     subprocess.Popen(['explorer', path])
+
+
+def open_exe(exe_path):
+    """Open an executable file."""
+    os.startfile(exe_path)
 
 
 def is_latest(remote_ver, local_ver):
