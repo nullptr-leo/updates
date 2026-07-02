@@ -41,10 +41,11 @@ def find_winrar():
 
 
 def fail_and_exit():
-    """Print failure info, pause, and exit."""
+    """Print failure info, pause (if interactive), and exit."""
     print('Query failed.')
     traceback.print_exc()
-    os.system('pause')
+    if sys.stdin.isatty():
+        os.system('pause')
     sys.exit(2)
 
 
@@ -138,12 +139,14 @@ def taskkill(image_name):
         ['taskkill', '/F', '/IM', image_name],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        creationflags=subprocess.CREATE_NO_WINDOW,
     )
 
 
 def extract_archive(winrar_exec, archive_path, dest_dir):
     """Extract an archive using WinRAR."""
-    subprocess.call([winrar_exec, 'x', '-o+-', '-inul', archive_path, dest_dir])
+    subprocess.call([winrar_exec, 'x', '-o+-', '-inul', archive_path, dest_dir],
+                    creationflags=subprocess.CREATE_NO_WINDOW)
 
 
 def run_installer(installer_path):
