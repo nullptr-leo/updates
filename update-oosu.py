@@ -19,7 +19,7 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-local_version = updater.get_file_version(os.path.join(oosu_path, 'Autoruns64.exe'))
+local_version = updater.get_file_version(os.path.join(oosu_path, 'OOSU10.exe'))
 print('Local version: %s' % local_version)
 
 # check if update is needed
