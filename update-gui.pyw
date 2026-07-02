@@ -6,6 +6,7 @@ launches every update-*.py concurrently and parses their stdout in real
 time to update the list.
 """
 import glob
+import json
 import os
 import queue
 import re
@@ -17,6 +18,7 @@ import tkinter as tk
 from tkinter import ttk
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_PATH = os.path.join(SCRIPT_DIR, 'update-config.json')
 
 # Status labels
 S_WAITING = '等待中'
@@ -33,11 +35,24 @@ _TERMINAL = {S_UPTODATE, S_SKIPPED, S_DONE, S_FAILED}
 _PCT_RE = re.compile(r'\(([\d.]+)%\)')
 
 
+def load_ignored():
+    """Return the set of ignored program names from update-config.json."""
+    try:
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            cfg = json.load(f)
+        return set(cfg.get('ignored_program', []))
+    except (OSError, ValueError):
+        return set()
+
+
 def find_scripts():
     """Return sorted [(filename, path)] of update-*.py in the script dir."""
+    ignored = load_ignored()
     scripts = []
     for path in glob.glob(os.path.join(SCRIPT_DIR, 'update-*.py')):
         base = os.path.basename(path)
+        if pretty_name(base) in ignored:
+            continue
         scripts.append((base, path))
     scripts.sort(key=lambda x: x[0])
     return scripts
