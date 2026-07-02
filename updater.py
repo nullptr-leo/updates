@@ -44,7 +44,7 @@ def fail_and_exit():
     """Print failure info, pause (if interactive), and exit."""
     print('Query failed.')
     traceback.print_exc()
-    if sys.stdin.isatty():
+    if sys.stdin.isatty() and not os.environ.get('UPDATE_NONINTERACTIVE'):
         os.system('pause')
     sys.exit(2)
 

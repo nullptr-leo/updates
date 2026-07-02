@@ -68,6 +68,7 @@ class ScriptTask:
         try:
             env = os.environ.copy()
             env['PYTHONUNBUFFERED'] = '1'
+            env['UPDATE_NONINTERACTIVE'] = '1'
             creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
             self.process = subprocess.Popen(
                 [sys.executable, '-u', self.path],
