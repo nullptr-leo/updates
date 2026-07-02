@@ -79,11 +79,11 @@ def get_appx_version(package_name):
     sys.exit(1)
 
 
-def test_proxy(proxy, enable_test=False):
+def test_proxy(proxy):
     """Test if a proxy is working by querying a known URL."""
     if os.environ.get('DISABLE_UPDATE_PROXY'):
         return None
-    if not enable_test:
+    if not os.environ.get('UPDATE_PROXY_CONNECTION_TEST'):
         return proxy
     try:
         response = requests.get('https://www.google.com/', proxies={'https': proxy})
