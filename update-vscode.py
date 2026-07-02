@@ -8,7 +8,6 @@ import updater
 
 # find out the utilities executable path
 vscode_path = updater.find_install_dir('Microsoft VS Code')
-winrar_exec = updater.find_winrar()
 
 # query the remote version
 print('Querying...')

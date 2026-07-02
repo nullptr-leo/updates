@@ -8,7 +8,6 @@ import updater
 
 # find out the utilities executable path
 bcompare_path = updater.find_install_dir('Beyond Compare')
-winrar_exec = updater.find_winrar()
 
 # query the remote version
 print('Querying...')

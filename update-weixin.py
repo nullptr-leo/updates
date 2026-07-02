@@ -9,7 +9,6 @@ import updater
 
 # find out the utilities executable path
 weixin_path = updater.find_install_dir(r'Tencent\Weixin')
-winrar_exec = updater.find_winrar()
 
 # query the remote version
 print('Querying...')

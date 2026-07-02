@@ -9,7 +9,6 @@ proxy = updater.test_proxy('socks5h://127.0.0.1:7890')
 
 # find out the utilities executable path
 python_path = updater.find_install_dir('Python')
-winrar_exec = updater.find_winrar()
 
 # query the remote version
 print('Querying...')

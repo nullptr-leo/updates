@@ -9,7 +9,6 @@ proxy = None
 
 # find out the utilities executable path
 insta360_path = updater.find_install_dir('Insta360 Studio')
-winrar_exec = updater.find_winrar()
 
 # query the remote version
 print('Querying...')
