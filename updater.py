@@ -81,7 +81,9 @@ def get_appx_version(package_name):
 
 def test_proxy(proxy):
     """Test if a proxy is working by querying a known URL."""
-    if os.environ.get('DISABLE_UPDATE_PROXY'):
+    if proxy in ('default', 'system'):
+        proxy = os.environ.get('UPDATE_PROXY_ADDR')
+    if not proxy:
         return None
     if not os.environ.get('UPDATE_PROXY_CONNECTION_TEST'):
         return proxy

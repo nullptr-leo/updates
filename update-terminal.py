@@ -5,7 +5,7 @@ import tempfile
 import updater
 
 # proxy
-proxy = updater.test_proxy('socks5h://127.0.0.1:7890')
+proxy = updater.test_proxy('default')
 
 # query the remote version
 print('Querying...')
