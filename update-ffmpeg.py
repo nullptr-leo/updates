@@ -25,7 +25,8 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-result = subprocess.run(['ffmpeg', '-version'], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+result = subprocess.run(['ffmpeg', '-version'], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                         creationflags=subprocess.CREATE_NO_WINDOW)
 local_info = result.stdout.decode('utf8').splitlines()[0]
 local_version = re.search(r'version N-[^-]*-[^-]*-([^ ]*)', local_info, flags=re.M).group(1)
 print('Local version: %s' % local_version)
