@@ -210,9 +210,16 @@ class App:
     def __init__(self, root):
         self.root = root
         root.title('Update Scripts')
-        root.geometry('860x540')
+
+        # Set size and centered position
+        sw = root.winfo_screenwidth()
+        sh = root.winfo_screenheight()
+        w = 860
+        h = 540
+        x = (sw - w) // 2
+        y = (sh - h) // 2
+        root.geometry('%dx%d+%d+%d' % (w, h, x, y))
         root.minsize(680, 320)
-        self._center_window(root)
 
         # window icon
         ico_path = os.path.join(SCRIPT_DIR, 'update.ico')
@@ -260,17 +267,6 @@ class App:
 
         self._populate()
         root.protocol('WM_DELETE_WINDOW', self._on_close)
-
-    @staticmethod
-    def _center_window(root):
-        root.update_idletasks()
-        w = root.winfo_width()
-        h = root.winfo_height()
-        sw = root.winfo_screenwidth()
-        sh = root.winfo_screenheight()
-        x = (sw - w) // 2
-        y = (sh - h) // 2
-        root.geometry('%dx%d+%d+%d' % (w, h, x, y))
 
     def _populate(self):
         self.scripts = find_scripts()
