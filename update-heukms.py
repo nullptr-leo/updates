@@ -17,7 +17,7 @@ winrar_exec = updater.find_winrar()
 print('Querying...')
 try:
     response = updater.query('https://github.com/zbezj/HEU_KMS_Activator/releases/latest', proxy=proxy)
-    remote_version = re.search(r'HEU_KMS_Activator_v([\d\.]*)', response, flags=re.M).group(1)
+    remote_version = re.search(r'tag/([\d\.]+)', response, flags=re.M).group(1)
 except Exception:
     updater.fail_and_exit()
 print('Remote version: %s' % remote_version)
