@@ -1,3 +1,6 @@
+requests[socks]
+pywin32
+packaging
 winrt-runtime
 winrt-Windows.Foundation.Collections
 winrt-Windows.Management.Deployment
