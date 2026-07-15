@@ -230,6 +230,8 @@ class App:
         self.running = False
         self.completed = 0
         self.total = 0
+        self.active_tasks = set()
+        self._processing = False
 
         # --- top bar ---
         top = ttk.Frame(root)
@@ -256,6 +258,8 @@ class App:
         self.tree.configure(yscrollcommand=vsb.set)
         self.tree.pack(side='left', fill='both', expand=True)
         vsb.pack(side='right', fill='y')
+
+        self.tree.bind('<Double-1>', self._on_double_click)
 
         # row colors by tag
         self.tree.tag_configure('idle', foreground='#808080')
@@ -315,6 +319,7 @@ class App:
         self.running = True
         self.completed = 0
         self.tasks = {}
+        self.active_tasks = set()
         self.update_all_btn.config(state='disabled')
         self.summary.config(text='0 / %d' % self.total)
 
@@ -322,10 +327,42 @@ class App:
             name = pretty_name(base)
             task = ScriptTask(name, path)
             self.tasks[name] = task
+            self.active_tasks.add(name)
             self._set_row(name, S_QUERYING, '', 'running')
             threading.Thread(target=task.run, args=(self.msg_queue,), daemon=True).start()
 
-        self.root.after(100, self._process_queue)
+        self._ensure_processing()
+
+    def update_one(self, name):
+        """Run a single update script for the given program name."""
+        if name in self.active_tasks:
+            return
+        path = None
+        for base, p in self.scripts:
+            if pretty_name(base) == name:
+                path = p
+                break
+        if not path:
+            return
+        task = ScriptTask(name, path)
+        self.tasks[name] = task
+        self.active_tasks.add(name)
+        self._set_row(name, S_QUERYING, '', 'running')
+        self.update_all_btn.config(state='disabled')
+        threading.Thread(target=task.run, args=(self.msg_queue,), daemon=True).start()
+        self._ensure_processing()
+
+    def _on_double_click(self, event):
+        item = self.tree.identify_row(event.y)
+        if not item:
+            return
+        name = self.tree.item(item, 'values')[0]
+        self.update_one(name)
+
+    def _ensure_processing(self):
+        if not self._processing:
+            self._processing = True
+            self.root.after(100, self._process_queue)
 
     def _process_queue(self):
         try:
@@ -336,18 +373,28 @@ class App:
                               tag, msg.get('reason', ''),
                               msg.get('local_version', ''), msg.get('remote_version', ''))
                 if msg.get('done'):
-                    self.completed += 1
+                    self.active_tasks.discard(msg['name'])
+                    if self.running:
+                        self.completed += 1
         except queue.Empty:
             pass
 
-        self.summary.config(text='%d / %d' % (self.completed, self.total))
-
-        if self.running and self.completed >= self.total:
-            self.running = False
+        if self.active_tasks:
+            self.update_all_btn.config(state='disabled')
+        else:
             self.update_all_btn.config(state='normal')
-            self.summary.config(text='完成 %d / %d' % (self.completed, self.total))
+            self._processing = False
 
         if self.running:
+            if self.completed >= self.total:
+                self.running = False
+                self.summary.config(text='完成 %d / %d' % (self.completed, self.total))
+            else:
+                self.summary.config(text='%d / %d' % (self.completed, self.total))
+        elif not self.active_tasks:
+            self.summary.config(text='共 %d 个软件' % self.total if self.total else '无软件')
+
+        if self.active_tasks:
             self.root.after(100, self._process_queue)
 
     def _on_close(self):
