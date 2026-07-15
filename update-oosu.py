@@ -5,6 +5,9 @@ import tempfile
 
 import updater
 
+# proxy
+proxy = updater.test_proxy('default')
+
 # find out the utilities executable path
 oosu_path = updater.find_install_dir('OOSU')
 winrar_exec = updater.find_winrar()
@@ -12,7 +15,7 @@ winrar_exec = updater.find_winrar()
 # query the remote version
 print('Querying...')
 try:
-    response = updater.query('https://www.oo-software.com/en/download/current/ooshutup10')
+    response = updater.query('https://www.oo-software.com/en/download/current/ooshutup10', proxy=proxy)
     remote_version = re.search(r'Build ([\d\.]*)', response, flags=re.M | re.I).group(1)
 except Exception:
     updater.fail_and_exit()
@@ -31,7 +34,7 @@ print('Preparing...')
 remote_url = 'https://dl5.oo-software.com/files/ooshutup10/OOSU10.exe'
 temp_dir = tempfile.mkdtemp()
 download_path = os.path.join(temp_dir, 'OOSU10.exe')
-updater.download(remote_url, download_path)
+updater.download(remote_url, download_path, proxy=proxy)
 
 # extract and update files
 updater.taskkill('OOSU10.exe')
