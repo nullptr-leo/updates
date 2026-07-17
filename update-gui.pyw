@@ -321,16 +321,21 @@ class App:
         self.active_tasks = set()
         self._processing = False
         self.tray = None
+        self._auto_timer = None
 
         # --- top bar ---
         top = ttk.Frame(root)
         top.pack(fill='x', padx=10, pady=(10, 6))
         self.summary = ttk.Label(top, text='')
         self.summary.pack(side='left')
-        self.tray_btn = ttk.Button(top, text='最小化到托盘', command=self.minimize_to_tray)
-        self.tray_btn.pack(side='right', padx=(0, 8))
         self.update_all_btn = ttk.Button(top, text='Update All', command=self.update_all)
         self.update_all_btn.pack(side='right')
+        self.tray_btn = ttk.Button(top, text='最小化到托盘', command=self.minimize_to_tray)
+        self.tray_btn.pack(side='right', padx=(0, 8))
+        self.auto_var = tk.BooleanVar(value=False)
+        self.auto_chk = ttk.Checkbutton(
+            top, text='定时更新', variable=self.auto_var, command=self.on_auto_toggle)
+        self.auto_chk.pack(side='right', padx=(0, 8))
 
         # --- list ---
         body = ttk.Frame(root)
@@ -497,6 +502,28 @@ class App:
         self.root.withdraw()
         self.tray.show()
 
+    def on_auto_toggle(self):
+        """Start or stop the periodic update timer based on the checkbox."""
+        if self.auto_var.get():
+            self._schedule_auto_update()
+        else:
+            self._cancel_auto_update()
+
+    def _schedule_auto_update(self):
+        self._auto_timer = self.root.after(10 * 60 * 1000, self._auto_update)
+
+    def _cancel_auto_update(self):
+        if self._auto_timer is not None:
+            self.root.after_cancel(self._auto_timer)
+            self._auto_timer = None
+
+    def _auto_update(self):
+        # run an update pass only when idle (not already updating)
+        if not self.running and self.scripts:
+            self.update_all()
+        # reschedule the next check
+        self._auto_timer = self.root.after(10 * 60 * 1000, self._auto_update)
+
     def restore_from_tray(self):
         """Bring the window back from the tray."""
         if self.tray:
@@ -512,6 +539,7 @@ class App:
         self._on_close()
 
     def _on_close(self):
+        self._cancel_auto_update()
         for task in self.tasks.values():
             task.stop()
         self.root.destroy()
