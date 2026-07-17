@@ -72,6 +72,23 @@ def pretty_name(filename):
     return name
 
 
+def get_git_version():
+    """Return (commit_count, commit_date) from git, or ('', '') on failure."""
+    try:
+        no_window = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+        count = subprocess.check_output(
+            ['git', 'rev-list', '--count', 'HEAD'],
+            cwd=SCRIPT_DIR, stderr=subprocess.DEVNULL, text=True,
+            creationflags=no_window).strip()
+        date = subprocess.check_output(
+            ['git', 'log', '-1', '--format=%ci'],
+            cwd=SCRIPT_DIR, stderr=subprocess.DEVNULL, text=True,
+            creationflags=no_window).strip()
+        return count, date
+    except Exception:
+        return '', ''
+
+
 class ScriptTask:
     """Runs one update script as a subprocess and streams its output."""
 
@@ -315,7 +332,11 @@ class App:
             format='%(asctime)s [%(levelname)s] %(message)s',
             encoding='utf-8',
         )
-        root.title('Update Scripts')
+        count, date = get_git_version()
+        title = 'Update Scripts'
+        if count and date:
+            title += f" - rev.{count} ({date.split()[0]})"
+        root.title(title)
 
         # Set size and centered position
         sw = root.winfo_screenwidth()
