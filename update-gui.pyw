@@ -13,6 +13,7 @@ import re
 import subprocess
 import sys
 import threading
+import time
 
 import tkinter as tk
 from tkinter import ttk
@@ -322,6 +323,7 @@ class App:
         self._processing = False
         self.tray = None
         self._auto_timer = None
+        self._update_session_active = False
 
         # --- top bar ---
         top = ttk.Frame(root)
@@ -336,6 +338,8 @@ class App:
         self.auto_chk = ttk.Checkbutton(
             top, text='定时更新', variable=self.auto_var, command=self.on_auto_toggle)
         self.auto_chk.pack(side='right', padx=(0, 8))
+        self.last_update_lbl = ttk.Label(top, text='上次更新：—')
+        self.last_update_lbl.pack(side='right', padx=(0, 8))
 
         # --- list ---
         body = ttk.Frame(root)
@@ -407,6 +411,7 @@ class App:
     def update_all(self):
         if self.running or not self.scripts:
             return
+        self._update_session_active = True
         # reset all rows
         for item in self.tree.get_children(''):
             cur = self.tree.item(item, 'values')
@@ -443,6 +448,7 @@ class App:
         task = ScriptTask(name, path)
         self.tasks[name] = task
         self.active_tasks.add(name)
+        self._update_session_active = True
         self._set_row(name, S_QUERYING, '', 'running')
         self.update_all_btn.config(state='disabled')
         threading.Thread(target=task.run, args=(self.msg_queue,), daemon=True).start()
@@ -454,6 +460,10 @@ class App:
             return
         name = self.tree.item(item, 'values')[0]
         self.update_one(name)
+
+    def _record_update_time(self):
+        self.last_update_lbl.config(
+            text='上次更新：' + time.strftime('%Y-%m-%d %H:%M:%S'))
 
     def _ensure_processing(self):
         if not self._processing:
@@ -489,6 +499,10 @@ class App:
                 self.summary.config(text='%d / %d' % (self.completed, self.total))
         elif not self.active_tasks:
             self.summary.config(text='共 %d 个软件' % self.total if self.total else '无软件')
+
+        if self._update_session_active and not self.active_tasks:
+            self._update_session_active = False
+            self._record_update_time()
 
         if self.active_tasks:
             self.root.after(100, self._process_queue)
