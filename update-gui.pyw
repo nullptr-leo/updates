@@ -7,6 +7,7 @@ time to update the list.
 """
 import glob
 import json
+import logging
 import os
 import queue
 import re
@@ -14,6 +15,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 
 import tkinter as tk
 from tkinter import ttk
@@ -83,6 +85,7 @@ class ScriptTask:
         self.seen_download = False
         self.local_version = ''
         self.remote_version = ''
+        self.output_lines = []
 
     def run(self, msg_queue):
         try:
@@ -104,7 +107,8 @@ class ScriptTask:
         except Exception as e:
             self.finished_status = S_FAILED
             self.fail_reason = str(e) or repr(e)
-            self._emit(msg_queue, S_FAILED, '', reason=self.fail_reason, done=True)
+            self._emit(msg_queue, S_FAILED, '', reason=self.fail_reason,
+                       detail=traceback.format_exc(), done=True)
             return
 
         # exit code 1 means the script chose to skip (e.g. software not
@@ -119,7 +123,9 @@ class ScriptTask:
             else:
                 self.finished_status = S_FAILED
                 self.fail_reason = '退出码 %d' % code
-        self._emit(msg_queue, self.finished_status, '', reason=self.fail_reason, done=True)
+        detail = '\n'.join(self.output_lines) if self.finished_status == S_FAILED else ''
+        self._emit(msg_queue, self.finished_status, '', reason=self.fail_reason,
+                   detail=detail, done=True)
 
     def _read_output(self, msg_queue):
         buf = ''
@@ -139,6 +145,7 @@ class ScriptTask:
         seg = seg.strip()
         if not seg:
             return
+        self.output_lines.append(seg)
         m_remote = re.search(r'Remote version:\s*(.*)', seg)
         m_local = re.search(r'Local version:\s*(.*)', seg)
         if m_remote:
@@ -180,11 +187,13 @@ class ScriptTask:
             self.finished_status = S_FAILED
             if not self.fail_reason:
                 self.fail_reason = '查询失败'
-            self._emit(msg_queue, S_FAILED, '', reason=self.fail_reason)
+            self._emit(msg_queue, S_FAILED, '', reason=self.fail_reason,
+                       detail='\n'.join(self.output_lines))
         elif 'not found' in seg:
             self.finished_status = S_FAILED
             self.fail_reason = seg
-            self._emit(msg_queue, S_FAILED, '', reason=self.fail_reason)
+            self._emit(msg_queue, S_FAILED, '', reason=self.fail_reason,
+                       detail='\n'.join(self.output_lines))
         elif self.finished_status == S_FAILED:
             # capture the most specific line from a traceback as the reason
             if (seg and not seg.startswith('Traceback')
@@ -192,12 +201,13 @@ class ScriptTask:
                     and not seg.startswith('During handling')):
                 self.fail_reason = seg
 
-    def _emit(self, msg_queue, status, progress, reason='', done=False):
+    def _emit(self, msg_queue, status, progress, reason='', done=False, detail=''):
         msg_queue.put({
             'name': self.name,
             'status': status,
             'progress': progress,
             'reason': reason,
+            'detail': detail,
             'local_version': self.local_version,
             'remote_version': self.remote_version,
             'done': done,
@@ -298,6 +308,13 @@ class TrayIcon:
 class App:
     def __init__(self, root):
         self.root = root
+        logging.basicConfig(
+            filename=os.path.join(SCRIPT_DIR, 'update-gui.log'),
+            filemode='a',
+            level=logging.ERROR,
+            format='%(asctime)s [%(levelname)s] %(message)s',
+            encoding='utf-8',
+        )
         root.title('Update Scripts')
 
         # Set size and centered position
@@ -465,6 +482,14 @@ class App:
         self.last_update_lbl.config(
             text='上次更新：' + time.strftime('%Y-%m-%d %H:%M:%S'))
 
+    def _log_failure(self, name, reason, detail):
+        msg = '软件 [%s] 更新失败' % name
+        if reason:
+            msg += '：%s' % reason
+        if detail:
+            msg += '\n--- 详细输出 ---\n' + detail
+        logging.error(msg)
+
     def _ensure_processing(self):
         if not self._processing:
             self._processing = True
@@ -478,6 +503,9 @@ class App:
                 self._set_row(msg['name'], msg['status'], msg.get('progress', ''),
                               tag, msg.get('reason', ''),
                               msg.get('local_version', ''), msg.get('remote_version', ''))
+                if msg['status'] == S_FAILED and msg.get('done'):
+                    self._log_failure(msg['name'], msg.get('reason', ''),
+                                      msg.get('detail', ''))
                 if msg.get('done'):
                     self.active_tasks.discard(msg['name'])
                     if self.running:
