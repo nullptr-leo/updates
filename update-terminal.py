@@ -1,6 +1,5 @@
 import os
 import re
-import tempfile
 
 import updater
 
@@ -27,13 +26,8 @@ if updater.is_latest(remote_version, local_version):
 # download package files
 print('Preparing...')
 remote_url = f'https://github.com/microsoft/terminal/releases/download/v{remote_version}/Microsoft.WindowsTerminal_{remote_version}_8wekyb3d8bbwe.msixbundle'
-temp_dir = tempfile.mkdtemp()
-download_path = os.path.join(temp_dir, remote_version + '.msixbundle')
+desktop_dir = os.path.join(os.path.expanduser('~'), 'Desktop')
+download_path = os.path.join(desktop_dir, remote_version + '.msixbundle')
 updater.download(remote_url, download_path, proxy=proxy)
-
-# extract and update files
-updater.taskkill('WindowsTerminal.exe')
-updater.run_installer(download_path)
-os.remove(download_path)
 
 updater.finish()
