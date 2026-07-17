@@ -17,6 +17,10 @@ import threading
 import tkinter as tk
 from tkinter import ttk
 
+import win32api
+import win32con
+import win32gui
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(SCRIPT_DIR, 'update-config.json')
 
@@ -206,6 +210,90 @@ class ScriptTask:
                 pass
 
 
+class TrayIcon:
+    """Minimal system tray icon built on pywin32."""
+
+    WM_TRAY = win32con.WM_USER + 20
+    ID_TRAY = 1
+
+    def __init__(self, icon_path, tooltip, on_restore, on_exit):
+        self.icon_path = icon_path
+        self.tooltip = tooltip
+        self.on_restore = on_restore
+        self.on_exit = on_exit
+        self.hwnd = None
+        self.hicon = None
+        self.visible = False
+        # keep a stable reference to the wndproc so it is not garbage collected
+        self._wnd_proc = self._wnd_proc
+        self._register_class()
+        self._create_window()
+        self._load_icon()
+
+    def _register_class(self):
+        self._wc = win32gui.WNDCLASS()
+        self._wc.hInstance = win32api.GetModuleHandle(None)
+        self._wc.lpszClassName = 'UpdateScriptsTrayWnd'
+        self._wc.lpfnWndProc = self._wnd_proc
+        self.class_atom = win32gui.RegisterClass(self._wc)
+
+    def _create_window(self):
+        self.hwnd = win32gui.CreateWindow(
+            self.class_atom, 'UpdateScriptsTray', 0, 0, 0, 0, 0,
+            win32con.HWND_MESSAGE, 0, self._wc.hInstance, None)
+
+    def _load_icon(self):
+        if self.icon_path and os.path.exists(self.icon_path):
+            self.hicon = win32gui.LoadImage(
+                None, self.icon_path, win32con.IMAGE_ICON, 0, 0,
+                win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE)
+        if not self.hicon:
+            self.hicon = win32gui.LoadIcon(0, win32con.IDI_APPLICATION)
+
+    def _wnd_proc(self, hwnd, msg, wparam, lparam):
+        if msg == self.WM_TRAY:
+            if lparam == win32con.WM_LBUTTONDBLCLK:
+                self.on_restore()
+            elif lparam == win32con.WM_RBUTTONUP:
+                self._show_menu()
+        elif msg == win32con.WM_DESTROY:
+            self.remove()
+        return win32gui.DefWindowProc(hwnd, msg, wparam, lparam)
+
+    def show(self):
+        if self.visible:
+            return
+        flags = win32gui.NIF_ICON | win32gui.NIF_MESSAGE | win32gui.NIF_TIP
+        nid = (self.hwnd, self.ID_TRAY, flags, self.WM_TRAY, self.hicon, self.tooltip)
+        win32gui.Shell_NotifyIcon(win32gui.NIM_ADD, nid)
+        self.visible = True
+
+    def remove(self):
+        if not self.visible:
+            return
+        nid = (self.hwnd, self.ID_TRAY, 0, 0, 0, '')
+        try:
+            win32gui.Shell_NotifyIcon(win32gui.NIM_DELETE, nid)
+        except Exception:
+            pass
+        self.visible = False
+
+    def _show_menu(self):
+        menu = win32gui.CreatePopupMenu()
+        win32gui.AppendMenu(menu, win32con.MF_STRING, 1, '显示窗口')
+        win32gui.AppendMenu(menu, win32con.MF_STRING, 2, '退出')
+        pos = win32api.GetCursorPos()
+        win32gui.SetForegroundWindow(self.hwnd)
+        cmd = win32gui.TrackPopupMenu(
+            menu, win32con.TPM_RETURNCMD | win32con.TPM_NONOTIFY,
+            pos[0], pos[1], 0, self.hwnd, None)
+        win32gui.DestroyMenu(menu)
+        if cmd == 1:
+            self.on_restore()
+        elif cmd == 2:
+            self.on_exit()
+
+
 class App:
     def __init__(self, root):
         self.root = root
@@ -222,8 +310,8 @@ class App:
         root.minsize(680, 320)
 
         # window icon
-        ico_path = os.path.join(SCRIPT_DIR, 'update.ico')
-        root.iconbitmap(default=ico_path)
+        self.ico_path = os.path.join(SCRIPT_DIR, 'update.ico')
+        root.iconbitmap(default=self.ico_path)
 
         self.msg_queue = queue.Queue()
         self.tasks = {}
@@ -232,12 +320,15 @@ class App:
         self.total = 0
         self.active_tasks = set()
         self._processing = False
+        self.tray = None
 
         # --- top bar ---
         top = ttk.Frame(root)
         top.pack(fill='x', padx=10, pady=(10, 6))
         self.summary = ttk.Label(top, text='')
         self.summary.pack(side='left')
+        self.tray_btn = ttk.Button(top, text='最小化到托盘', command=self.minimize_to_tray)
+        self.tray_btn.pack(side='right', padx=(0, 8))
         self.update_all_btn = ttk.Button(top, text='Update All', command=self.update_all)
         self.update_all_btn.pack(side='right')
 
@@ -396,6 +487,29 @@ class App:
 
         if self.active_tasks:
             self.root.after(100, self._process_queue)
+
+    def minimize_to_tray(self):
+        """Hide the window and show a system tray icon instead."""
+        if self.tray is None:
+            self.tray = TrayIcon(
+                self.ico_path, 'Update Scripts',
+                on_restore=self.restore_from_tray, on_exit=self.exit_app)
+        self.root.withdraw()
+        self.tray.show()
+
+    def restore_from_tray(self):
+        """Bring the window back from the tray."""
+        if self.tray:
+            self.tray.remove()
+        self.root.deiconify()
+        self.root.lift()
+        self.root.focus_force()
+
+    def exit_app(self):
+        """Quit the application from the tray menu."""
+        if self.tray:
+            self.tray.remove()
+        self._on_close()
 
     def _on_close(self):
         for task in self.tasks.values():
