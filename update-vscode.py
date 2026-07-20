@@ -29,6 +29,7 @@ if updater.is_latest(remote_version, local_version):
 
 # navigate to download the update
 print('Preparing...')
+updater.taskkill('Code.exe')
 updater.open_exe(local_path)
 
 updater.finish()
