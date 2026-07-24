@@ -398,6 +398,9 @@ class App:
         vsb.pack(side='right', fill='y')
 
         self.tree.bind('<Double-1>', self._on_double_click)
+        self.tree.bind('<Button-3>', self._on_right_click)
+        self._ctx_menu = tk.Menu(self.tree, tearoff=0)
+        self._ctx_menu.add_command(label='检查更新', command=self._ctx_check_update)
 
         # row colors by tag
         self.tree.tag_configure('idle', foreground='#808080')
@@ -498,6 +501,21 @@ class App:
             return
         name = self.tree.item(item, 'values')[0]
         self.update_one(name)
+
+    def _on_right_click(self, event):
+        item = self.tree.identify_row(event.y)
+        if not item:
+            return
+        self.tree.selection_set(item)
+        self._ctx_name = self.tree.item(item, 'values')[0]
+        try:
+            self._ctx_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self._ctx_menu.grab_release()
+
+    def _ctx_check_update(self):
+        if getattr(self, '_ctx_name', None):
+            self.update_one(self._ctx_name)
 
     def _record_update_time(self):
         self.last_update_lbl.config(
