@@ -52,6 +52,21 @@ def load_ignored():
         return set()
 
 
+def add_ignored(name):
+    """Add a program name to the ignored_program list in update-config.json."""
+    try:
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            cfg = json.load(f)
+    except (OSError, ValueError):
+        cfg = {}
+    ignored = cfg.get('ignored_program', [])
+    if name not in ignored:
+        ignored.append(name)
+        cfg['ignored_program'] = ignored
+        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+            json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+
 def find_scripts():
     """Return sorted [(filename, path)] of update-*.py in the script dir."""
     ignored = load_ignored()
@@ -401,6 +416,7 @@ class App:
         self.tree.bind('<Button-3>', self._on_right_click)
         self._ctx_menu = tk.Menu(self.tree, tearoff=0)
         self._ctx_menu.add_command(label='检查更新', command=self._ctx_check_update)
+        self._ctx_menu.add_command(label='忽略', command=self._ctx_ignore)
 
         # row colors by tag
         self.tree.tag_configure('idle', foreground='#808080')
@@ -516,6 +532,22 @@ class App:
     def _ctx_check_update(self):
         if getattr(self, '_ctx_name', None):
             self.update_one(self._ctx_name)
+
+    def _ctx_ignore(self):
+        name = getattr(self, '_ctx_name', None)
+        if not name:
+            return
+        if name in self.active_tasks:
+            return
+        add_ignored(name)
+        # remove the row from the list and the scripts cache
+        for item in self.tree.get_children(''):
+            if self.tree.item(item, 'values')[0] == name:
+                self.tree.delete(item)
+                break
+        self.scripts = [(b, p) for b, p in self.scripts if pretty_name(b) != name]
+        self.total = len(self.scripts)
+        self.summary.config(text='共 %d 个软件' % self.total if self.total else '无软件')
 
     def _record_update_time(self):
         self.last_update_lbl.config(
