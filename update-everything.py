@@ -5,6 +5,9 @@ import tempfile
 
 import updater
 
+# proxy
+proxy = None
+
 # find out the utilities executable path
 everything_path = updater.find_install_dir('Everything')
 winrar_exec = updater.find_winrar()
@@ -17,7 +20,7 @@ headers = {
 }
 
 try:
-    response = updater.query('https://www.voidtools.com/forum/viewtopic.php?t=9787', headers=headers)
+    response = updater.query('https://www.voidtools.com/forum/viewtopic.php?t=9787', headers=headers, proxy=proxy)
     remote_version = re.search(r'Everything\-([\d\.]*)', response, flags=re.M).group(1)
 except Exception:
     updater.fail_and_exit()
@@ -36,7 +39,7 @@ print('Preparing...')
 remote_url = 'https://www.voidtools.com/Everything-' + remote_version + 'b.x64.zip'
 temp_dir = tempfile.mkdtemp()
 download_path = os.path.join(temp_dir, remote_version + '.zip')
-updater.download(remote_url, download_path)
+updater.download(remote_url, download_path, proxy=proxy)
 
 # extract and update files
 updater.taskkill('Everything.exe')

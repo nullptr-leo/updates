@@ -6,6 +6,9 @@ import tempfile
 
 import updater
 
+# proxy
+proxy = None
+
 # find out the utilities executable path
 winrar_path = updater.find_install_dir('WinRAR')
 winrar_exec = updater.find_winrar()
@@ -13,7 +16,7 @@ winrar_exec = updater.find_winrar()
 # query the remote version
 print('Querying...')
 try:
-    response = updater.query('https://www.ghxi.com/winrarlh.html')
+    response = updater.query('https://www.ghxi.com/winrarlh.html', proxy=proxy)
     remote_version = re.search(r'WinRAR v([\d\.]*)', response, flags=re.M).group(1)
 except Exception:
     updater.fail_and_exit()

@@ -6,13 +6,16 @@ import tempfile
 
 import updater
 
+# proxy
+proxy = None
+
 # find out the utilities executable path
 otp_path = updater.find_install_dir('Office Tool')
 
 # query the remote version
 print('Querying...')
 try:
-    response = updater.get_redirected_url('https://otp.landian.vip/redirect/download.php?type=runtime&arch=x64')
+    response = updater.get_redirected_url('https://otp.landian.vip/redirect/download.php?type=runtime&arch=x64', proxy=proxy)
     remote_version = re.search(r'v([\d\.]*)', response, flags=re.M).group(1)
 except Exception:
     updater.fail_and_exit()

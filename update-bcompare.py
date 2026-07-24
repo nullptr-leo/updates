@@ -6,13 +6,16 @@ import tempfile
 
 import updater
 
+# proxy
+proxy = None
+
 # find out the utilities executable path
 bcompare_path = updater.find_install_dir('Beyond Compare')
 
 # query the remote version
 print('Querying...')
 try:
-    response = updater.query('https://www.ghxi.com/beyondcompare.html')
+    response = updater.query('https://www.ghxi.com/beyondcompare.html', proxy=proxy)
     remote_version = re.search(r'Beyond Compare v([\d\.]*)', response, flags=re.M).group(1)
 except Exception:
     updater.fail_and_exit()

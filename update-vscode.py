@@ -6,13 +6,16 @@ import tempfile
 
 import updater
 
+# proxy
+proxy = None
+
 # find out the utilities executable path
 vscode_path = updater.find_install_dir('Microsoft VS Code')
 
 # query the remote version
 print('Querying...')
 try:
-    response = updater.get_redirected_url('https://code.visualstudio.com/sha/download?build=stable&os=win32-x64')
+    response = updater.get_redirected_url('https://code.visualstudio.com/sha/download?build=stable&os=win32-x64', proxy=proxy)
     remote_version = re.search(r'x64-([\d\.]*)\.', response, flags=re.M).group(1)
 except Exception:
     updater.fail_and_exit()

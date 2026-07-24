@@ -5,6 +5,9 @@ import tempfile
 
 import updater
 
+# proxy
+proxy = None
+
 # find out the utilities executable path
 viv_path = updater.find_install_dir('Void Image Viewer')
 winrar_exec = updater.find_winrar()
@@ -17,7 +20,7 @@ headers = {
 }
 
 try:
-    response = updater.query('https://www.voidtools.com/zh-cn/downloads', headers=headers)
+    response = updater.query('https://www.voidtools.com/zh-cn/downloads', headers=headers, proxy=proxy)
     remote_version = re.search(r'voidImageViewer\-([\d\.]*)\.x64', response, flags=re.M).group(1)
 except Exception:
     updater.fail_and_exit()
@@ -36,7 +39,7 @@ print('Preparing...')
 remote_url = f'https://www.voidtools.com/voidImageViewer-{remote_version}.x64.en-US.zip'
 temp_dir = tempfile.mkdtemp()
 download_path = os.path.join(temp_dir, remote_version + '.zip')
-updater.download(remote_url, download_path)
+updater.download(remote_url, download_path, proxy=proxy)
 
 # extract and update files
 updater.taskkill('voidImageViewer.exe')
