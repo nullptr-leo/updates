@@ -8,7 +8,7 @@ import updater
 proxy = None
 
 # find out the utilities executable path
-listary_path = updater.find_install_dir('aDrive')
+adrive_path = updater.find_install_dir('aDrive')
 
 # query the remote version
 print('Querying...')
@@ -20,7 +20,7 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-local_version = updater.get_file_version(os.path.join(listary_path, 'aDrive.exe'))
+local_version = updater.get_file_version(os.path.join(adrive_path, 'aDrive.exe'))
 print('Local version: %s' % local_version)
 
 # check if update is needed
