@@ -88,7 +88,7 @@ def test_proxy(proxy):
     if not os.environ.get('UPDATE_PROXY_CONNECTION_TEST'):
         return proxy
     try:
-        response = requests.get('https://www.google.com/', proxies={'https': proxy})
+        response = requests.get('https://www.google.com/', proxies={'https': proxy}, timeout=15)
         return proxy if response.status_code == 200 else None
     except Exception:
         return None
@@ -108,11 +108,11 @@ def get_redirected_url(url, headers=None, proxy=None):
     """Return the final URL after following redirects, without downloading content."""
     proxies = {'https': proxy, 'http': proxy} if proxy else None
     try:
-        response = requests.head(url, headers=headers, proxies=proxies, allow_redirects=True, verify=False)
+        response = requests.head(url, headers=headers, proxies=proxies, allow_redirects=True, verify=False, timeout=(10, 30))
         if response.status_code < 400:
             return response.url
         # Fallback: some servers reject HEAD, use stream GET and close immediately
-        response = requests.get(url, headers=headers, proxies=proxies, stream=True, allow_redirects=True, verify=False)
+        response = requests.get(url, headers=headers, proxies=proxies, stream=True, allow_redirects=True, verify=False, timeout=(10, 30))
         response.close()
         return response.url
     except Exception:
@@ -121,7 +121,7 @@ def get_redirected_url(url, headers=None, proxy=None):
 
 def download(url, dest_path, proxy=None):
     """Download a file with a progress indicator."""
-    with closing(requests.get(url, stream=True, proxies={'https': proxy, 'http': proxy} if proxy else None, timeout=30, verify=False)) as response:
+    with closing(requests.get(url, stream=True, proxies={'https': proxy, 'http': proxy} if proxy else None, timeout=(30, 120), verify=False)) as response:
         response.raise_for_status()
         chunk_size = 65536  # 64KB
         content_size = int(response.headers.get('content-length', 0))
