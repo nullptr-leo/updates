@@ -9,7 +9,8 @@ import updater
 proxy = None
 
 # find out the utilities executable path
-qianwen_path = updater.find_install_dir('QianwenApp')
+qianwen_dir = ['QianwenApp', 'Qianwen\\QianwenApp']
+qianwen_path = updater.find_install_dir(qianwen_dir)
 
 # query the remote version
 print('Querying...')

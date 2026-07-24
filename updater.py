@@ -26,12 +26,22 @@ SEARCH_PATHS = [
 ]
 
 def find_install_dir(folder_name):
-    """Find an installed software directory by folder name."""
-    for prog_path in SEARCH_PATHS:
-        path = os.path.join(prog_path, folder_name)
-        if os.path.exists(path):
-            return path
-    print(f'{folder_name} not found.')
+    """Find an installed software directory by folder name.
+
+    folder_name may be a single name or a list of candidate names; the first
+    one that exists (in any of SEARCH_PATHS) is returned. Exits if none are
+    found.
+    """
+    if isinstance(folder_name, str):
+        names = [folder_name]
+    else:
+        names = list(folder_name)
+    for name in names:
+        for prog_path in SEARCH_PATHS:
+            path = os.path.join(prog_path, name)
+            if os.path.exists(path):
+                return path
+    print('%s not found.' % ', '.join(names))
     sys.exit(1)
 
 
