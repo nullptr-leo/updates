@@ -385,8 +385,6 @@ class App:
         self.summary.pack(side='left')
         self.update_all_btn = ttk.Button(top, text='更新全部', command=self.update_all)
         self.update_all_btn.pack(side='right')
-        self.tray_btn = ttk.Button(top, text='最小化到托盘', command=self.minimize_to_tray)
-        self.tray_btn.pack(side='right', padx=(0, 8))
         self.auto_var = tk.BooleanVar(value=False)
         self.auto_chk = ttk.Checkbutton(
             top, text='定时更新', variable=self.auto_var, command=self.on_auto_toggle)
