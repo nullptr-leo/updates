@@ -22,7 +22,9 @@ from tkinter import ttk
 
 import win32api
 import win32con
+import win32event
 import win32gui
+import winerror
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(SCRIPT_DIR, 'update-config.json')
@@ -257,6 +259,7 @@ class TrayIcon:
     """Minimal system tray icon built on pywin32."""
 
     WM_TRAY = win32con.WM_USER + 20
+    WM_BRING_TO_FRONT = win32con.WM_USER + 21
     ID_TRAY = 1
 
     def __init__(self, icon_path, tooltip, on_restore, on_exit):
@@ -299,6 +302,8 @@ class TrayIcon:
                 self.on_restore()
             elif lparam == win32con.WM_RBUTTONUP:
                 self._show_menu()
+        elif msg == self.WM_BRING_TO_FRONT:
+            self.on_restore()
         elif msg == win32con.WM_DESTROY:
             self.remove()
         return win32gui.DefWindowProc(hwnd, msg, wparam, lparam)
@@ -665,14 +670,64 @@ class App:
         self.root.destroy()
 
 
+WINDOW_TITLE_PREFIX = 'Update Scripts'
+
+
+def _find_existing_window():
+    """Return the HWND of an existing Update Scripts window, or None."""
+    found = []
+
+    def enum_cb(hwnd, _):
+        if win32gui.GetWindowText(hwnd).startswith(WINDOW_TITLE_PREFIX):
+            found.append(hwnd)
+            return False
+        return True
+
+    win32gui.EnumWindows(enum_cb, None)
+    return found[0] if found else None
+
+
+def _activate_existing_instance():
+    """Restore and focus the already-running instance's window.
+
+    The running instance restores its own window (which reliably handles both
+    minimized-to-taskbar and minimized-to-tray states). We also try to reveal
+    and focus the main window directly as a best-effort fallback.
+    """
+    tray_hwnd = win32gui.FindWindow('UpdateScriptsTrayWnd', None)
+    if tray_hwnd:
+        win32gui.PostMessage(tray_hwnd, TrayIcon.WM_BRING_TO_FRONT, 0, 0)
+    hwnd = _find_existing_window()
+    if hwnd:
+        if win32gui.IsIconic(hwnd):
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+        else:
+            win32gui.ShowWindow(hwnd, win32con.SW_SHOW)
+        win32api.Sleep(120)
+        try:
+            win32gui.SetForegroundWindow(hwnd)
+        except Exception:
+            pass
+
+
 def main():
-    root = tk.Tk()
+    # Enforce a single running instance via a named mutex.
+    mutex_name = 'UpdateScriptsGuiSingleInstance'
+    mutex = win32event.CreateMutex(None, False, mutex_name)
+    if win32api.GetLastError() == winerror.ERROR_ALREADY_EXISTS:
+        # Another instance is running: ask it to restore and bring to front.
+        _activate_existing_instance()
+        return
     try:
-        ttk.Style().theme_use('clam')
-    except tk.TclError:
-        pass
-    App(root)
-    root.mainloop()
+        root = tk.Tk()
+        try:
+            ttk.Style().theme_use('clam')
+        except tk.TclError:
+            pass
+        App(root)
+        root.mainloop()
+    finally:
+        win32api.CloseHandle(mutex)
 
 
 if __name__ == '__main__':
