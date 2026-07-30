@@ -383,7 +383,7 @@ class App:
         top.pack(fill='x', padx=10, pady=(10, 6))
         self.summary = ttk.Label(top, text='')
         self.summary.pack(side='left')
-        self.update_all_btn = ttk.Button(top, text='Update All', command=self.update_all)
+        self.update_all_btn = ttk.Button(top, text='更新全部', command=self.update_all)
         self.update_all_btn.pack(side='right')
         self.tray_btn = ttk.Button(top, text='最小化到托盘', command=self.minimize_to_tray)
         self.tray_btn.pack(side='right', padx=(0, 8))
