@@ -426,8 +426,14 @@ class App:
         self.tree.tag_configure('skipped', foreground='#b26a00')
         self.tree.tag_configure('failed', foreground='#d93025')
 
+        # system tray icon is always present from startup
+        self.tray = TrayIcon(
+            self.ico_path, 'Update Scripts',
+            on_restore=self.restore_from_tray, on_exit=self.exit_app)
+        self.tray.show()
+
         self._populate()
-        root.protocol('WM_DELETE_WINDOW', self._on_close)
+        root.protocol('WM_DELETE_WINDOW', self.on_close)
 
     def _populate(self):
         self.scripts = find_scripts()
@@ -607,13 +613,10 @@ class App:
             self.root.after(100, self._process_queue)
 
     def minimize_to_tray(self):
-        """Hide the window and show a system tray icon instead."""
-        if self.tray is None:
-            self.tray = TrayIcon(
-                self.ico_path, 'Update Scripts',
-                on_restore=self.restore_from_tray, on_exit=self.exit_app)
+        """Hide the window; the tray icon remains available."""
         self.root.withdraw()
-        self.tray.show()
+        if self.tray is not None:
+            self.tray.show()
 
     def on_auto_toggle(self):
         """Start or stop the periodic update timer based on the checkbox."""
@@ -638,21 +641,27 @@ class App:
         self._auto_timer = self.root.after(10 * 60 * 1000, self._auto_update)
 
     def restore_from_tray(self):
-        """Bring the window back from the tray."""
-        if self.tray:
-            self.tray.remove()
+        """Bring the window back from the tray (the tray icon stays)."""
         self.root.deiconify()
         self.root.lift()
         self.root.focus_force()
 
     def exit_app(self):
         """Quit the application from the tray menu."""
-        if self.tray:
-            self.tray.remove()
-        self._on_close()
+        self.quit_app()
 
-    def _on_close(self):
+    def on_close(self):
+        """Closing the window minimizes to tray instead of quitting."""
+        if self.tray is not None:
+            self.minimize_to_tray()
+        else:
+            self.quit_app()
+
+    def quit_app(self):
+        """Fully quit the application."""
         self._cancel_auto_update()
+        if self.tray is not None:
+            self.tray.remove()
         for task in self.tasks.values():
             task.stop()
         self.root.destroy()
