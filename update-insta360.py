@@ -14,8 +14,16 @@ insta360_path = updater.find_install_dir('Insta360 Studio')
 print('Querying...')
 try:
     response = updater.query('https://www.insta360.com/cn/download/insta360-x4', proxy=proxy)
-    remote_url = re.findall(r'(https://wassets\.insta360\.com/[^"]*\.exe)', response, flags=re.M)[-1]
-    remote_version = re.search(r'Insta360_Studio_([\d\.]*)', remote_url, flags=re.M).group(1)
+    # collect every Insta360 Studio installer link
+    urls = re.findall(r'(https://wassets\.insta360\.com/[^"]*Insta360_Studio_[^"]*\.exe)', response)
+    if not urls:
+        raise ValueError('未找到 Insta360 Studio 下载链接')
+    # pick the one with the highest version number
+    def _ver(u):
+        m = re.search(r'Insta360_Studio_([\d.]+)', u)
+        return updater.version.parse(m.group(1)) if m else updater.version.parse('0')
+    remote_url = max(urls, key=_ver)
+    remote_version = re.search(r'Insta360_Studio_([\d.]+)', remote_url).group(1)
 except Exception:
     updater.fail_and_exit()
 print('Remote version: %s' % remote_version)
