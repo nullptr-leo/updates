@@ -20,8 +20,12 @@ headers = {
 }
 
 try:
-    response = updater.query('https://www.voidtools.com/forum/viewtopic.php?t=9787', headers=headers, proxy=proxy)
-    remote_version = re.search(r'Everything\-([\d\.]*)', response, flags=re.M).group(1)
+    response = updater.query('https://www.voidtools.com/downloads/', headers=headers, proxy=proxy)
+    # collect every 64-bit zip installer version from the download page
+    versions = re.findall(r'Everything\-([\d.]+)[ab]?\.x64\.zip', response)
+    if not versions:
+        raise ValueError('未找到 Everything 下载链接')
+    remote_version = str(max(versions, key=lambda v: updater.version.parse(v)))
 except Exception:
     updater.fail_and_exit()
 print('Remote version: %s' % remote_version)
@@ -36,7 +40,7 @@ if updater.is_latest(remote_version, local_version):
 
 # download package files
 print('Preparing...')
-remote_url = 'https://www.voidtools.com/Everything-' + remote_version + 'b.x64.zip'
+remote_url = 'https://www.voidtools.com/Everything-' + remote_version + '.x64.zip'
 temp_dir = tempfile.mkdtemp()
 download_path = os.path.join(temp_dir, remote_version + '.zip')
 updater.download(remote_url, download_path, proxy=proxy)
