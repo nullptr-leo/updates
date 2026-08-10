@@ -470,8 +470,6 @@ class App:
             if vals[0] == name:
                 self.tree.item(item, values=(name, local_version, remote_version, display),
                                tags=(tag,))
-                if tag == 'running':
-                    self.tree.see(item)
                 return
 
     def update_all(self):
