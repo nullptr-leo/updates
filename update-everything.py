@@ -22,7 +22,7 @@ headers = {
 try:
     response = updater.query('https://www.voidtools.com/downloads/', headers=headers, proxy=proxy)
     # collect every 64-bit zip installer version from the download page
-    versions = re.findall(r'Everything\-([\d.]+)[ab]?\.x64\.zip', response)
+    versions = re.findall(r'Everything\-([\d.]+[ab])?\.x64\.zip', response)
     if not versions:
         raise ValueError('未找到 Everything 下载链接')
     remote_version = str(max(versions, key=lambda v: updater.version.parse(v)))
