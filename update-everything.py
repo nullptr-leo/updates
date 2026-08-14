@@ -6,7 +6,7 @@ import tempfile
 import updater
 
 # proxy
-proxy = None
+proxy = updater.test_proxy('default')
 
 # find out the utilities executable path
 everything_path = updater.find_install_dir('Everything')
