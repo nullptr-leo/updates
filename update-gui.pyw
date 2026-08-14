@@ -17,6 +17,8 @@ import threading
 import time
 import traceback
 
+import updater
+
 import tkinter as tk
 from tkinter import ttk
 
@@ -419,6 +421,7 @@ class App:
         self.tree.bind('<Button-3>', self._on_right_click)
         self._ctx_menu = tk.Menu(self.tree, tearoff=0)
         self._ctx_menu.add_command(label='检查更新', command=self._ctx_check_update)
+        self._ctx_menu.add_command(label='打开程序目录', command=self._ctx_open_dir)
         self._ctx_menu.add_command(label='忽略', command=self._ctx_ignore)
 
         # row colors by tag
@@ -539,6 +542,38 @@ class App:
     def _ctx_check_update(self):
         if getattr(self, '_ctx_name', None):
             self.update_one(self._ctx_name)
+
+    def _ctx_open_dir(self):
+        name = getattr(self, '_ctx_name', None)
+        if not name:
+            return
+        path = None
+        for base, p in self.scripts:
+            if pretty_name(base) == name:
+                path = p
+                break
+        if not path:
+            return
+        # parse the upgrade script to find the install directory folder name
+        folder = None
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                text = f.read()
+            m = re.search(r"find_install_dir\(\s*r?['\"]([^'\"]+)['\"]\s*\)", text)
+            if m:
+                folder = m.group(1)
+        except (OSError, ValueError):
+            folder = None
+        if not folder:
+            return
+        target = updater.find_install_dir(folder)
+        if not target or not os.path.isdir(target):
+            return
+        # open the directory (or its containing dir if target is a file)
+        if os.path.isfile(target):
+            target = os.path.dirname(target)
+        os.startfile(target) if hasattr(os, 'startfile') else \
+            subprocess.Popen(['explorer', target])
 
     def _ctx_ignore(self):
         name = getattr(self, '_ctx_name', None)
