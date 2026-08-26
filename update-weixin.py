@@ -60,6 +60,6 @@ if updater.is_latest(remote_version, local_version):
 print('Preparing...')
 updater.taskkill('Weixin.exe')
 updater.open_url('https://www.52pojie.cn/' + html.unescape(remote_url))
-updater.open_explorer(weixin_path)
+# updater.open_explorer(weixin_path)
 
 updater.finish()
