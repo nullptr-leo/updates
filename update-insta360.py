@@ -38,13 +38,12 @@ if updater.is_latest(remote_version, local_version):
 
 # download package files
 print('Preparing...')
-temp_dir = tempfile.mkdtemp()
-download_path = os.path.join(temp_dir, remote_version + '.exe')
-updater.download(remote_url, download_path, proxy=proxy)
+with tempfile.TemporaryDirectory() as temp_dir:
+    download_path = os.path.join(temp_dir, remote_version + '.exe')
+    updater.download(remote_url, download_path, proxy=proxy)
 
-# extract and update files
-updater.taskkill('Insta360 Studio.exe')
-updater.run_installer(download_path)
-os.remove(download_path)
+    # extract and update files
+    updater.taskkill('Insta360 Studio.exe')
+    updater.run_installer(download_path)
 
 updater.finish()

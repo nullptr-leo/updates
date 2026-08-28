@@ -30,13 +30,12 @@ if updater.is_latest(remote_version, local_version):
 # download package files
 print('Preparing...')
 remote_url = 'https://github.com/git-for-windows/git/releases/download/v' + remote_version + '.windows.1/Git-' + remote_version + '-64-bit.exe'
-temp_dir = tempfile.mkdtemp()
-download_path = os.path.join(temp_dir, remote_version + '.exe')
-updater.download(remote_url, download_path, proxy=proxy)
+with tempfile.TemporaryDirectory() as temp_dir:
+    download_path = os.path.join(temp_dir, remote_version + '.exe')
+    updater.download(remote_url, download_path, proxy=proxy)
 
-# extract and update files
-updater.taskkill('git-cmd.exe')
-updater.run_installer(download_path)
-os.remove(download_path)
+    # extract and update files
+    updater.taskkill('git-cmd.exe')
+    updater.run_installer(download_path)
 
 updater.finish()

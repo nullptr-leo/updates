@@ -30,12 +30,11 @@ if updater.is_latest_str(remote_version, local_version):
 # download package files
 print('Preparing...')
 remote_url = 'https://www.python.org/ftp/python/' + remote_version + '/python-' + remote_version + '-amd64.exe'
-temp_dir = tempfile.mkdtemp()
-download_path = os.path.join(temp_dir, remote_version + '.exe')
-updater.download(remote_url, download_path, proxy=proxy)
+with tempfile.TemporaryDirectory() as temp_dir:
+    download_path = os.path.join(temp_dir, remote_version + '.exe')
+    updater.download(remote_url, download_path, proxy=proxy)
 
-# extract and update files
-updater.run_installer(download_path)
-os.remove(download_path)
+    # extract and update files
+    updater.run_installer(download_path)
 
 updater.finish()
