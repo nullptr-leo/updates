@@ -17,7 +17,7 @@ winrar_exec = updater.find_winrar()
 # query the remote version
 print('Querying...')
 try:
-    response = updater.get_redirected_url('https://dl.snipaste.com/win-x64-cn')
+    response = updater.get_redirected_url('https://dl.snipaste.com/win-x64-cn', proxy=proxy)
     remote_version = re.search(r'Snipaste-([\d\.]*)', response, flags=re.M | re.I).group(1)
 except Exception:
     updater.fail_and_exit()
@@ -37,7 +37,7 @@ print('Preparing...')
 remote_url = 'https://dl.snipaste.com/win-x64-cn'
 temp_dir = tempfile.mkdtemp()
 download_path = os.path.join(temp_dir, remote_version + '.zip')
-updater.download(remote_url, download_path)
+updater.download(remote_url, download_path, proxy=proxy)
 
 # extract and update files
 updater.taskkill('Snipaste.exe')

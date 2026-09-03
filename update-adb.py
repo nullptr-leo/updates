@@ -38,7 +38,7 @@ print('Preparing...')
 remote_url = 'https://dl.google.com/android/repository/platform-tools-latest-windows.zip'
 temp_dir = tempfile.mkdtemp()
 download_path = os.path.join(temp_dir, remote_version + '.zip')
-updater.download(remote_url, download_path)
+updater.download(remote_url, download_path, proxy=proxy)
 
 # extract and update files
 updater.taskkill('adb.exe')
