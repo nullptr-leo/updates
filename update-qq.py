@@ -1,7 +1,5 @@
 import json
 import os
-import re
-import tempfile
 
 import updater
 
@@ -17,7 +15,6 @@ try:
     response = updater.query('https://qq-web.cdn-go.cn/im.qq.com_new/latest/rainbow/pcConfig.json', proxy=proxy)
     remote_info = json.loads(response)['Windows']
     remote_version = remote_info['version']
-    remote_url = remote_info['ntDownloadX64Url']
 except Exception:
     updater.fail_and_exit()
 print('Remote version: %s' % remote_version)
@@ -30,14 +27,11 @@ print('Local version: %s' % local_version)
 if updater.is_latest(remote_version, local_version):
     updater.already_latest()
 
-# download package files
+# navigate to download the update
+# The official CDN rejects direct downloads (HTTP 403), so open the official
+# download page instead of fetching the installer ourselves.
 print('Preparing...')
-with tempfile.TemporaryDirectory() as temp_dir:
-    download_path = os.path.join(temp_dir, remote_version + '.exe')
-    updater.download(remote_url, download_path, proxy=proxy)
-
-    # extract and update files
-    updater.taskkill('QQ.exe')
-    updater.run_installer(download_path)
+updater.taskkill('QQ.exe')
+updater.open_url('https://im.qq.com/pcqq/')
 
 updater.finish()
