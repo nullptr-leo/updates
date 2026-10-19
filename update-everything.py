@@ -41,15 +41,14 @@ if updater.is_latest(remote_version, local_version):
 # download package files
 print('Preparing...')
 remote_url = 'https://www.voidtools.com/Everything-' + remote_version + '.x64.zip'
-temp_dir = tempfile.mkdtemp()
-download_path = os.path.join(temp_dir, remote_version + '.zip')
-updater.download(remote_url, download_path, proxy=proxy)
+with tempfile.TemporaryDirectory() as temp_dir:
+    download_path = os.path.join(temp_dir, remote_version + '.zip')
+    updater.download(remote_url, download_path, proxy=proxy)
 
-# extract and update files
-updater.taskkill('Everything.exe')
-updater.extract_archive(winrar_exec, download_path, temp_dir)
-os.remove(download_path)
-shutil.copytree(temp_dir, everything_path, dirs_exist_ok=True)
-shutil.rmtree(temp_dir)
+    # extract and update files
+    updater.taskkill('Everything.exe')
+    updater.extract_archive(winrar_exec, download_path, temp_dir)
+    os.remove(download_path)
+    shutil.copytree(temp_dir, everything_path, dirs_exist_ok=True)
 
 updater.finish()

@@ -34,16 +34,15 @@ if updater.is_latest(remote_version, local_version):
 # download package files
 print('Preparing...')
 remote_url = f'https://github.com/ZyperWave/ZyperWinOptimize/releases/download/v{remote_version}/ZyperWin++{remote_version}.zip'
-temp_dir = tempfile.mkdtemp()
-download_path = os.path.join(temp_dir, remote_version + '.zip')
-updater.download(remote_url, download_path, proxy=proxy)
+with tempfile.TemporaryDirectory() as temp_dir:
+    download_path = os.path.join(temp_dir, remote_version + '.zip')
+    updater.download(remote_url, download_path, proxy=proxy)
 
-# extract and update files
-updater.taskkill('ZyperWin++.exe')
-updater.extract_archive(winrar_exec, download_path, temp_dir)
-os.remove(download_path)
-deflate_path = glob.glob(os.path.join(temp_dir, 'Release'))[0]
-shutil.copytree(deflate_path, zyperwin_path, dirs_exist_ok=True)
-shutil.rmtree(temp_dir)
+    # extract and update files
+    updater.taskkill('ZyperWin++.exe')
+    updater.extract_archive(winrar_exec, download_path, temp_dir)
+    os.remove(download_path)
+    deflate_path = glob.glob(os.path.join(temp_dir, 'Release'))[0]
+    shutil.copytree(deflate_path, zyperwin_path, dirs_exist_ok=True)
 
 updater.finish()

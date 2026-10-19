@@ -42,17 +42,16 @@ if updater.is_latest(remote_version, local_version) and remote_date <= local_dat
 
 # download package files
 print('Preparing...')
-temp_dir = tempfile.mkdtemp()
-download_path = os.path.join(temp_dir, remote_version + '.7z')
-updater.download(remote_url, download_path, proxy=proxy)
+with tempfile.TemporaryDirectory() as temp_dir:
+    download_path = os.path.join(temp_dir, remote_version + '.7z')
+    updater.download(remote_url, download_path, proxy=proxy)
 
-# extract and update files
-updater.taskkill('vlc.exe')
-updater.extract_archive(winrar_exec, download_path, temp_dir)
-os.remove(download_path)
-deflate_path = glob.glob(os.path.join(temp_dir, 'vlc-*'))[0]
-shutil.rmtree(vlc_dir)
-shutil.copytree(deflate_path, vlc_dir, dirs_exist_ok=True)
-shutil.rmtree(temp_dir)
+    # extract and update files
+    updater.taskkill('vlc.exe')
+    updater.extract_archive(winrar_exec, download_path, temp_dir)
+    os.remove(download_path)
+    deflate_path = glob.glob(os.path.join(temp_dir, 'vlc-*'))[0]
+    shutil.rmtree(vlc_dir)
+    shutil.copytree(deflate_path, vlc_dir, dirs_exist_ok=True)
 
 updater.finish()

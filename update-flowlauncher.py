@@ -33,16 +33,15 @@ if updater.is_latest(remote_version, local_version):
 # download package files
 print('Preparing...')
 remote_url = 'https://github.com/Flow-Launcher/Flow.Launcher/releases/download/v' + remote_version + '/Flow-Launcher-Portable.zip'
-temp_dir = tempfile.mkdtemp()
-download_path = os.path.join(temp_dir, remote_version + '.zip')
-updater.download(remote_url, download_path, proxy=proxy)
+with tempfile.TemporaryDirectory() as temp_dir:
+    download_path = os.path.join(temp_dir, remote_version + '.zip')
+    updater.download(remote_url, download_path, proxy=proxy)
 
-# extract and update files
-updater.taskkill('Flow.Launcher.exe')
-updater.extract_archive(winrar_exec, download_path, temp_dir)
-os.remove(download_path)
-deflate_path = glob.glob(os.path.join(temp_dir, 'FlowLauncher'))[0]
-shutil.copytree(deflate_path, flowlauncher_path, dirs_exist_ok=True)
-shutil.rmtree(temp_dir)
+    # extract and update files
+    updater.taskkill('Flow.Launcher.exe')
+    updater.extract_archive(winrar_exec, download_path, temp_dir)
+    os.remove(download_path)
+    deflate_path = glob.glob(os.path.join(temp_dir, 'FlowLauncher'))[0]
+    shutil.copytree(deflate_path, flowlauncher_path, dirs_exist_ok=True)
 
 updater.finish()

@@ -34,16 +34,15 @@ if updater.is_latest(remote_version, local_version):
 # download package files
 print('Preparing...')
 remote_url = f'https://github.com/zbezj/HEU_KMS_Activator/releases/download/{remote_version}/HEU_KMS_Activator_v{remote_version}.rar'
-temp_dir = tempfile.mkdtemp()
-download_path = os.path.join(temp_dir, remote_version + '.rar')
-updater.download(remote_url, download_path, proxy=proxy)
+with tempfile.TemporaryDirectory() as temp_dir:
+    download_path = os.path.join(temp_dir, remote_version + '.rar')
+    updater.download(remote_url, download_path, proxy=proxy)
 
-# extract and update files
-updater.extract_archive(winrar_exec, download_path, temp_dir)
-os.remove(download_path)
-deflate_path = glob.glob(os.path.join(temp_dir, 'HEU_KMS_Activator*'))[0]
-shutil.copy(deflate_path, heu_path)
-shutil.rmtree(temp_dir)
+    # extract and update files
+    updater.extract_archive(winrar_exec, download_path, temp_dir)
+    os.remove(download_path)
+    deflate_path = glob.glob(os.path.join(temp_dir, 'HEU_KMS_Activator*'))[0]
+    shutil.copy(deflate_path, heu_path)
 os.remove(local_path)
 
 updater.finish()

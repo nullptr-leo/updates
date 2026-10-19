@@ -38,16 +38,15 @@ if updater.is_latest(remote_version, local_version):
 # download package files
 print('Preparing...')
 remote_url = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip'
-temp_dir = tempfile.mkdtemp()
-download_path = os.path.join(temp_dir, remote_version + '.zip')
-updater.download(remote_url, download_path, proxy=proxy)
+with tempfile.TemporaryDirectory() as temp_dir:
+    download_path = os.path.join(temp_dir, remote_version + '.zip')
+    updater.download(remote_url, download_path, proxy=proxy)
 
-# extract and update files
-updater.taskkill('ffmpeg.exe')
-updater.extract_archive(winrar_exec, download_path, temp_dir)
-os.remove(download_path)
-deflate_path = glob.glob(os.path.join(temp_dir, 'ffmpeg-*'))[0]
-shutil.copytree(deflate_path, ffmpeg_path, dirs_exist_ok=True)
-shutil.rmtree(temp_dir)
+    # extract and update files
+    updater.taskkill('ffmpeg.exe')
+    updater.extract_archive(winrar_exec, download_path, temp_dir)
+    os.remove(download_path)
+    deflate_path = glob.glob(os.path.join(temp_dir, 'ffmpeg-*'))[0]
+    shutil.copytree(deflate_path, ffmpeg_path, dirs_exist_ok=True)
 
 updater.finish()

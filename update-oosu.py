@@ -32,13 +32,12 @@ if updater.is_latest(remote_version, local_version):
 # download package files
 print('Preparing...')
 remote_url = 'https://dl5.oo-software.com/files/ooshutup10/OOSU10.exe'
-temp_dir = tempfile.mkdtemp()
-download_path = os.path.join(temp_dir, 'OOSU10.exe')
-updater.download(remote_url, download_path, proxy=proxy)
+with tempfile.TemporaryDirectory() as temp_dir:
+    download_path = os.path.join(temp_dir, 'OOSU10.exe')
+    updater.download(remote_url, download_path, proxy=proxy)
 
-# extract and update files
-updater.taskkill('OOSU10.exe')
-shutil.copy(os.path.join(temp_dir, 'OOSU10.exe'), os.path.join(oosu_path, 'OOSU10.exe'))
-shutil.rmtree(temp_dir)
+    # extract and update files
+    updater.taskkill('OOSU10.exe')
+    shutil.copy(os.path.join(temp_dir, 'OOSU10.exe'), os.path.join(oosu_path, 'OOSU10.exe'))
 
 updater.finish()

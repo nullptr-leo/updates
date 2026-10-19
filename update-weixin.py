@@ -37,7 +37,7 @@ try:
     remote_info = None
     for pageid in range(1, 3):
         response = updater.query(f'https://www.52pojie.cn/forum.php?mod=forumdisplay&fid=16&typeid=231&filter=typeid&typeid=231&page={pageid}', proxy=proxy)
-        remote_info = re.search(r'(forum\.php[^"]*)[^>]*>微信Windows版 v([\d\.]*)', response, flags=re.M)
+        remote_info = re.search(r'(forum\.php[^"]*)[^>]*>微信Windows版 v+([\d\.]*)', response, flags=re.M)
         if remote_info:
             remote_version = remote_info.group(2)
             remote_url = remote_info.group(1)

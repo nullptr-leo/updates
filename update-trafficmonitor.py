@@ -34,16 +34,15 @@ if updater.is_latest(remote_version, local_version):
 # download package files
 print('Preparing...')
 remote_url = 'https://github.com/zhongyang219/TrafficMonitor/releases/download/V' + remote_version + '/TrafficMonitor_V' + remote_version + '_x64.zip'
-temp_dir = tempfile.mkdtemp()
-download_path = os.path.join(temp_dir, remote_version + '.zip')
-updater.download(remote_url, download_path, proxy=proxy)
+with tempfile.TemporaryDirectory() as temp_dir:
+    download_path = os.path.join(temp_dir, remote_version + '.zip')
+    updater.download(remote_url, download_path, proxy=proxy)
 
-# extract and update files
-updater.taskkill('TrafficMonitor.exe')
-updater.extract_archive(winrar_exec, download_path, temp_dir)
-os.remove(download_path)
-deflate_path = glob.glob(os.path.join(temp_dir, 'TrafficMonitor'))[0]
-shutil.copytree(deflate_path, trafficmonitor_path, dirs_exist_ok=True)
-shutil.rmtree(temp_dir)
+    # extract and update files
+    updater.taskkill('TrafficMonitor.exe')
+    updater.extract_archive(winrar_exec, download_path, temp_dir)
+    os.remove(download_path)
+    deflate_path = glob.glob(os.path.join(temp_dir, 'TrafficMonitor'))[0]
+    shutil.copytree(deflate_path, trafficmonitor_path, dirs_exist_ok=True)
 
 updater.finish()
