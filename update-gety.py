@@ -14,7 +14,7 @@ gety_path = updater.find_install_dir('Gety')
 print('Querying...')
 try:
     response = updater.query('https://gety.ai/zh/download/', proxy=proxy)
-    remote_version = re.search(r'v([\d\.]+)', response, flags=re.M).group(1)
+    remote_version = re.search(r'>v([\d\.]+)', response, flags=re.M).group(1)
 except Exception:
     updater.fail_and_exit()
 print('Remote version: %s' % remote_version)
