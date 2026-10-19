@@ -403,7 +403,7 @@ class App:
         body = ttk.Frame(root)
         body.pack(fill='both', expand=True, padx=10, pady=(0, 10))
         columns = ('name', 'local', 'remote', 'status')
-        self.tree = ttk.Treeview(body, columns=columns, show='headings', selectmode='browse')
+        self.tree = ttk.Treeview(body, columns=columns, show='headings', selectmode='extended')
         self.tree.heading('name', text='软件名称')
         self.tree.heading('local', text='本地版本')
         self.tree.heading('remote', text='远程版本')
@@ -532,7 +532,11 @@ class App:
         item = self.tree.identify_row(event.y)
         if not item:
             return
-        self.tree.selection_set(item)
+        # if the right-clicked row is not part of the current selection,
+        # select only it; otherwise keep the whole selection
+        if item not in self.tree.selection():
+            self.tree.selection_set(item)
+        self._ctx_item = item
         self._ctx_name = self.tree.item(item, 'values')[0]
         try:
             self._ctx_menu.tk_popup(event.x_root, event.y_root)
@@ -540,8 +544,10 @@ class App:
             self._ctx_menu.grab_release()
 
     def _ctx_check_update(self):
-        if getattr(self, '_ctx_name', None):
-            self.update_one(self._ctx_name)
+        names = [self.tree.item(i, 'values')[0]
+                 for i in self.tree.selection()]
+        for name in names:
+            self.update_one(name)
 
     def _ctx_open_dir(self):
         name = getattr(self, '_ctx_name', None)
