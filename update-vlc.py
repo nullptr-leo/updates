@@ -42,6 +42,7 @@ if updater.is_latest(remote_version, local_version) and remote_date <= local_dat
 
 # download package files
 print('Preparing...')
+
 with tempfile.TemporaryDirectory() as temp_dir:
     download_path = os.path.join(temp_dir, remote_version + '.7z')
     updater.download(remote_url, download_path, proxy=proxy)

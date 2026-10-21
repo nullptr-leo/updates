@@ -32,6 +32,7 @@ if updater.is_latest(remote_version, local_version):
 # download package files
 print('Preparing...')
 remote_url = 'https://dl5.oo-software.com/files/ooshutup10/OOSU10.exe'
+
 with tempfile.TemporaryDirectory() as temp_dir:
     download_path = os.path.join(temp_dir, 'OOSU10.exe')
     updater.download(remote_url, download_path, proxy=proxy)

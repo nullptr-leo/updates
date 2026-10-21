@@ -31,6 +31,7 @@ if updater.is_latest(remote_version, local_version):
 # download package files
 print('Preparing...')
 remote_url = f"https://prod.download.desktop.kiro.dev/releases/stable/win32-x64/signed/{remote_version}/kiro-ide-{remote_version}-stable-win32-x64.exe"
+
 with tempfile.TemporaryDirectory() as temp_dir:
     download_path = os.path.join(temp_dir, remote_version + '.exe')
     updater.download(remote_url, download_path, proxy=proxy)

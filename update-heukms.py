@@ -34,6 +34,7 @@ if updater.is_latest(remote_version, local_version):
 # download package files
 print('Preparing...')
 remote_url = f'https://github.com/zbezj/HEU_KMS_Activator/releases/download/{remote_version}/HEU_KMS_Activator_v{remote_version}.rar'
+
 with tempfile.TemporaryDirectory() as temp_dir:
     download_path = os.path.join(temp_dir, remote_version + '.rar')
     updater.download(remote_url, download_path, proxy=proxy)

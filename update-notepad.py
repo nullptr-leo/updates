@@ -30,6 +30,7 @@ if updater.is_latest(remote_version, local_version):
 # download package files
 print('Preparing...')
 remote_url = 'https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v' + remote_version + '/npp.' + remote_version + '.Installer.x64.exe'
+
 with tempfile.TemporaryDirectory() as temp_dir:
     download_path = os.path.join(temp_dir, remote_version + '.exe')
     updater.download(remote_url, download_path, proxy=proxy)

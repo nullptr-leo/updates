@@ -23,7 +23,6 @@ print('Remote version: %s' % remote_version)
 
 # query the local version
 local_path = glob.glob(os.path.join(snowair_path, 'SnowAir-Lite-*.exe'))[0]
-local_name = os.path.basename(local_path)
 local_version = updater.get_file_version(local_path)
 print('Local version: %s' % local_version)
 
@@ -33,15 +32,14 @@ if updater.is_latest(remote_version, local_version):
 
 # download package files
 print('Preparing...')
-remote_url = f"https://github.com/CM-idea/SnowAir/releases/download/v{remote_version}-lite/SnowAir-Lite-v{remote_version}.exe"
-temp_dir = tempfile.mkdtemp()
-download_path = os.path.join(temp_dir, f"SnowAir-Lite-v{remote_version}.exe")
-updater.download(remote_url, download_path, proxy=proxy)
+remote_url = f"https://github.com/CM-idea/SnowAir/releases/download/v{remote_version}-lite/SnowAir-Lite.exe"
 
-# extract and update files
-updater.taskkill(local_name)
-shutil.copy(download_path, os.path.join(snowair_path, f"SnowAir-Lite-v{remote_version}.exe"))
-shutil.rmtree(temp_dir)
-os.remove(local_path)
+with tempfile.TemporaryDirectory() as temp_dir:
+    download_path = os.path.join(temp_dir, "SnowAir-Lite.exe")
+    updater.download(remote_url, download_path, proxy=proxy)
+
+    # extract and update files
+    updater.taskkill("SnowAir-Lite.exe")
+    shutil.copy(download_path, os.path.join(snowair_path, "SnowAir-Lite.exe"))
 
 updater.finish()

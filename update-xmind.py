@@ -30,6 +30,7 @@ if updater.is_latest(remote_version, local_version):
 # download package files
 print('Preparing...')
 remote_url = 'https://xmind.cn/zen/download/win64/'
+
 with tempfile.TemporaryDirectory() as temp_dir:
     download_path = os.path.join(temp_dir, remote_version + '.exe')
     updater.download(remote_url, download_path, proxy=proxy)

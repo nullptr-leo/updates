@@ -34,6 +34,7 @@ if updater.is_latest(remote_version, local_version):
 # download package files
 print('Preparing...')
 remote_url = f'https://github.com/ZyperWave/ZyperWinOptimize/releases/download/v{remote_version}/ZyperWin++{remote_version}.zip'
+
 with tempfile.TemporaryDirectory() as temp_dir:
     download_path = os.path.join(temp_dir, remote_version + '.zip')
     updater.download(remote_url, download_path, proxy=proxy)
