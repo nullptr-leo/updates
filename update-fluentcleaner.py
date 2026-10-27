@@ -32,7 +32,7 @@ if updater.is_latest(remote_version, local_version):
 
 # download package files
 print('Preparing...')
-remote_url = f"https://github.com/builtbybel/FluentCleaner/releases/download/{remote_version}/FluentCleaner-win-x64.zip"
+remote_url = f'https://github.com/builtbybel/FluentCleaner/releases/download/{remote_version}/FluentCleaner-win-x64.zip'
 
 with tempfile.TemporaryDirectory() as temp_dir:
     download_path = os.path.join(temp_dir, remote_version + '.zip')

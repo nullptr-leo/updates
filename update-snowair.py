@@ -33,14 +33,14 @@ if updater.is_latest(remote_version, local_version):
 
 # download package files
 print('Preparing...')
-remote_url = f"https://github.com/CM-idea/SnowAir/releases/download/v{remote_version}-lite/SnowAir-Lite-v{remote_version}.exe"
+remote_url = f'https://github.com/CM-idea/SnowAir/releases/download/v{remote_version}-lite/SnowAir-Lite-v{remote_version}.exe'
 
 with tempfile.TemporaryDirectory() as temp_dir:
-    download_path = os.path.join(temp_dir, "SnowAir-Lite.exe")
+    download_path = os.path.join(temp_dir, 'SnowAir-Lite.exe')
     updater.download(remote_url, download_path, proxy=proxy)
 
     # extract and update files
-    updater.taskkill("SnowAir-Lite.exe")
+    updater.taskkill('SnowAir-Lite.exe')
     shutil.copy(download_path, snowair_path)
 
 updater.finish()
