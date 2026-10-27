@@ -33,16 +33,16 @@ if updater.is_latest(remote_version, local_version):
 # download package files
 print('Preparing...')
 remote_url = f"https://github.com/builtbybel/FluentCleaner/releases/download/{remote_version}/FluentCleaner-win-x64.zip"
-temp_dir = tempfile.mkdtemp()
-download_path = os.path.join(temp_dir, remote_version + '.zip')
-updater.download(remote_url, download_path, proxy=proxy)
 
-# extract and update files
-updater.taskkill('FCleaner.exe')
-updater.extract_archive(winrar_exec, download_path, temp_dir)
-os.remove(download_path)
-deflate_path = glob.glob(os.path.join(temp_dir, 'FluentCleaner-win-x64'))[0]
-shutil.copytree(deflate_path, fluentcleaner_dir, dirs_exist_ok=True)
-shutil.rmtree(temp_dir)
+with tempfile.TemporaryDirectory() as temp_dir:
+    download_path = os.path.join(temp_dir, remote_version + '.zip')
+    updater.download(remote_url, download_path, proxy=proxy)
+
+    # extract and update files
+    updater.taskkill('FCleaner.exe')
+    updater.extract_archive(winrar_exec, download_path, temp_dir)
+    os.remove(download_path)
+    deflate_path = glob.glob(os.path.join(temp_dir, 'FluentCleaner-win-x64'))[0]
+    shutil.copytree(deflate_path, fluentcleaner_dir, dirs_exist_ok=True)
 
 updater.finish()
