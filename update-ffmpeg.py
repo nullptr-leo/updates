@@ -11,7 +11,7 @@ import updater
 proxy = updater.test_proxy('default')
 
 # find out the utilities executable path
-ffmpeg_path = updater.find_install_dir('ffmpeg')
+ffmpeg_dir = updater.find_install_dir('ffmpeg')
 winrar_exec = updater.find_winrar()
 
 # query the remote version
@@ -48,6 +48,6 @@ with tempfile.TemporaryDirectory() as temp_dir:
     updater.extract_archive(winrar_exec, download_path, temp_dir)
     os.remove(download_path)
     deflate_path = glob.glob(os.path.join(temp_dir, 'ffmpeg-*'))[0]
-    shutil.copytree(deflate_path, ffmpeg_path, dirs_exist_ok=True)
+    shutil.copytree(deflate_path, ffmpeg_dir, dirs_exist_ok=True)
 
 updater.finish()

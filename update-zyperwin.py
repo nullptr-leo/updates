@@ -10,7 +10,7 @@ import updater
 proxy = updater.test_proxy('default')
 
 # find out the utilities executable path
-zyperwin_path = updater.find_install_dir('ZyperWin')
+zyperwin_dir = updater.find_install_dir('ZyperWin')
 winrar_exec = updater.find_winrar()
 
 # query the remote version
@@ -24,7 +24,7 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-local_version = updater.get_file_version(os.path.join(zyperwin_path, 'ZyperWin++.exe'))
+local_version = updater.get_file_version(os.path.join(zyperwin_dir, 'ZyperWin++.exe'))
 print('Local version: %s' % local_version)
 
 # check if update is needed
@@ -44,6 +44,6 @@ with tempfile.TemporaryDirectory() as temp_dir:
     updater.extract_archive(winrar_exec, download_path, temp_dir)
     os.remove(download_path)
     deflate_path = glob.glob(os.path.join(temp_dir, 'Release'))[0]
-    shutil.copytree(deflate_path, zyperwin_path, dirs_exist_ok=True)
+    shutil.copytree(deflate_path, zyperwin_dir, dirs_exist_ok=True)
 
 updater.finish()

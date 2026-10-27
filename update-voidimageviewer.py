@@ -9,7 +9,7 @@ import updater
 proxy = None
 
 # find out the utilities executable path
-viv_path = updater.find_install_dir('Void Image Viewer')
+viv_dir = updater.find_install_dir('Void Image Viewer')
 winrar_exec = updater.find_winrar()
 
 # query the remote version
@@ -27,7 +27,7 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-local_version = updater.get_file_version(os.path.join(viv_path, 'voidImageViewer.exe'))
+local_version = updater.get_file_version(os.path.join(viv_dir, 'voidImageViewer.exe'))
 print('Local version: %s' % local_version)
 
 # check if update is needed
@@ -46,6 +46,6 @@ with tempfile.TemporaryDirectory() as temp_dir:
     updater.taskkill('voidImageViewer.exe')
     updater.extract_archive(winrar_exec, download_path, temp_dir)
     os.remove(download_path)
-    shutil.copytree(temp_dir, viv_path, dirs_exist_ok=True)
+    shutil.copytree(temp_dir, viv_dir, dirs_exist_ok=True)
 
 updater.finish()

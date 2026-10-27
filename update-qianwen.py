@@ -9,8 +9,8 @@ import updater
 proxy = None
 
 # find out the utilities executable path
-qianwen_dir = ['QianwenApp', 'Qianwen\\QianwenApp']
-qianwen_path = updater.find_install_dir(qianwen_dir)
+qianwen_candidates = ['QianwenApp', 'Qianwen\\QianwenApp']
+qianwen_dir = updater.find_install_dir(qianwen_candidates)
 
 # query the remote version
 print('Querying...')
@@ -23,7 +23,7 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-local_version = updater.get_file_version(os.path.join(qianwen_path, 'qianwen.exe'))
+local_version = updater.get_file_version(os.path.join(qianwen_dir, 'qianwen.exe'))
 print('Local version: %s' % local_version)
 
 # check if update is needed

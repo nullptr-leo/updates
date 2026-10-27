@@ -8,7 +8,7 @@ import updater
 proxy = None
 
 # find out the utilities executable path
-meeting_path = updater.find_install_dir(r'Tencent\WeMeet')
+meeting_dir = updater.find_install_dir(r'Tencent\WeMeet')
 
 # query the remote version
 print('Querying...')
@@ -22,7 +22,7 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-local_version = updater.get_file_version(os.path.join(meeting_path, 'wemeetapp.exe'))
+local_version = updater.get_file_version(os.path.join(meeting_dir, 'wemeetapp.exe'))
 print('Local version: %s' % local_version)
 
 # check if update is needed

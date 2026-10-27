@@ -9,7 +9,7 @@ import updater
 proxy = updater.test_proxy('default')
 
 # find out the utilities executable path
-oosu_path = updater.find_install_dir('OOSU')
+oosu_dir = updater.find_install_dir('OOSU')
 winrar_exec = updater.find_winrar()
 
 # query the remote version
@@ -22,7 +22,8 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-local_version = updater.get_file_version(os.path.join(oosu_path, 'OOSU10.exe'))
+oosu_path = os.path.join(oosu_dir, 'OOSU10.exe')
+local_version = updater.get_file_version(oosu_path)
 print('Local version: %s' % local_version)
 
 # check if update is needed
@@ -39,6 +40,6 @@ with tempfile.TemporaryDirectory() as temp_dir:
 
     # extract and update files
     updater.taskkill('OOSU10.exe')
-    shutil.copy(os.path.join(temp_dir, 'OOSU10.exe'), os.path.join(oosu_path, 'OOSU10.exe'))
+    shutil.copy(os.path.join(temp_dir, 'OOSU10.exe'), oosu_path)
 
 updater.finish()

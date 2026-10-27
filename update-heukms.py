@@ -10,7 +10,7 @@ import updater
 proxy = updater.test_proxy('default')
 
 # find out the utilities executable path
-heu_path = updater.find_install_dir('HEU KMS Activator')
+heu_dir = updater.find_install_dir('HEU KMS Activator')
 winrar_exec = updater.find_winrar()
 
 # query the remote version
@@ -23,7 +23,7 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-local_path = glob.glob(os.path.join(heu_path, 'HEU_KMS_Activator*'))[0]
+local_path = glob.glob(os.path.join(heu_dir, 'HEU_KMS_Activator*'))[0]
 local_version = updater.get_file_version(local_path)
 print('Local version: %s' % local_version)
 
@@ -43,7 +43,7 @@ with tempfile.TemporaryDirectory() as temp_dir:
     updater.extract_archive(winrar_exec, download_path, temp_dir)
     os.remove(download_path)
     deflate_path = glob.glob(os.path.join(temp_dir, 'HEU_KMS_Activator*'))[0]
-    shutil.copy(deflate_path, heu_path)
+    shutil.copy(deflate_path, heu_dir)
 os.remove(local_path)
 
 updater.finish()

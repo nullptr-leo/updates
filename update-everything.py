@@ -9,7 +9,7 @@ import updater
 proxy = updater.test_proxy('default')
 
 # find out the utilities executable path
-everything_path = updater.find_install_dir('Everything')
+everything_dir = updater.find_install_dir('Everything')
 winrar_exec = updater.find_winrar()
 
 # query the remote version
@@ -31,7 +31,7 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-local_version = updater.get_file_version(os.path.join(everything_path, 'Everything.exe'))
+local_version = updater.get_file_version(os.path.join(everything_dir, 'Everything.exe'))
 print('Local version: %s' % local_version)
 
 # check if update is needed
@@ -50,6 +50,6 @@ with tempfile.TemporaryDirectory() as temp_dir:
     updater.taskkill('Everything.exe')
     updater.extract_archive(winrar_exec, download_path, temp_dir)
     os.remove(download_path)
-    shutil.copytree(temp_dir, everything_path, dirs_exist_ok=True)
+    shutil.copytree(temp_dir, everything_dir, dirs_exist_ok=True)
 
 updater.finish()

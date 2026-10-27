@@ -8,7 +8,7 @@ import updater
 proxy = updater.test_proxy('default')
 
 # find out the utilities executable path
-python_path = updater.find_install_dir('Python')
+python_dir = updater.find_install_dir('Python')
 
 # query the remote version
 print('Querying...')
@@ -20,7 +20,7 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-local_version = updater.get_file_version(os.path.join(python_path, 'python.exe'))
+local_version = updater.get_file_version(os.path.join(python_dir, 'python.exe'))
 print('Local version: %s' % local_version)
 
 # check if update is needed

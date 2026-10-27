@@ -10,7 +10,7 @@ import updater
 proxy = None
 
 # find out the utilities executable path
-vscode_path = updater.find_install_dir('Microsoft VS Code')
+vscode_dir = updater.find_install_dir('Microsoft VS Code')
 
 # query the remote version
 print('Querying...')
@@ -22,8 +22,8 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-local_path = os.path.join(vscode_path, 'Code.exe')
-local_version = updater.get_file_version(local_path)
+vscode_path = os.path.join(vscode_dir, 'Code.exe')
+local_version = updater.get_file_version(vscode_path)
 print('Local version: %s' % local_version)
 
 # check if update is needed
@@ -33,6 +33,6 @@ if updater.is_latest(remote_version, local_version):
 # navigate to download the update
 print('Preparing...')
 updater.taskkill('Code.exe')
-updater.open_exe(local_path)
+updater.open_exe(vscode_path)
 
 updater.finish()

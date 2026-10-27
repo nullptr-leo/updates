@@ -9,7 +9,7 @@ import updater
 proxy = None
 
 # find out the utilities executable path
-autorun_path = updater.find_install_dir('Autoruns')
+autorun_dir = updater.find_install_dir('Autoruns')
 winrar_exec = updater.find_winrar()
 
 # query the remote version
@@ -25,7 +25,8 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-local_version = updater.get_file_version(os.path.join(autorun_path, 'Autoruns64.exe'))
+autorun_path = os.path.join(autorun_dir, 'Autoruns64.exe')
+local_version = updater.get_file_version(autorun_path)
 print('Local version: %s' % local_version)
 
 # check if update is needed
@@ -44,6 +45,6 @@ with tempfile.TemporaryDirectory() as temp_dir:
     updater.taskkill('Autoruns64.exe')
     updater.extract_archive(winrar_exec, download_path, temp_dir)
     os.remove(download_path)
-    shutil.copy(os.path.join(temp_dir, 'Autoruns64.exe'), os.path.join(autorun_path, 'Autoruns64.exe'))
+    shutil.copy(os.path.join(temp_dir, 'Autoruns64.exe'), autorun_path)
 
 updater.finish()

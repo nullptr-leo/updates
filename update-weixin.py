@@ -11,12 +11,12 @@ import updater
 proxy = None
 
 # find out the utilities executable path
-weixin_path = updater.find_install_dir(r'Tencent\Weixin')
+weixin_dir = updater.find_install_dir(r'Tencent\Weixin')
 
 # remove old version directories
 version_paths = []
-for _name in os.listdir(weixin_path):
-    _full = os.path.join(weixin_path, _name)
+for _name in os.listdir(weixin_dir):
+    _full = os.path.join(weixin_dir, _name)
     if not os.path.isdir(_full):
         continue
     _m = re.match(r'^(\d+(?:\.\d+)*)$', _name)
@@ -49,7 +49,7 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-local_version = updater.get_file_version(os.path.join(weixin_path, 'Weixin.exe'))
+local_version = updater.get_file_version(os.path.join(weixin_dir, 'Weixin.exe'))
 print('Local version: %s' % local_version)
 
 # check if update is needed
@@ -60,6 +60,6 @@ if updater.is_latest(remote_version, local_version):
 print('Preparing...')
 updater.taskkill('Weixin.exe')
 updater.open_url('https://www.52pojie.cn/' + html.unescape(remote_url))
-# updater.open_explorer(weixin_path)
+# updater.open_explorer(weixin_dir)
 
 updater.finish()

@@ -10,7 +10,7 @@ import updater
 proxy = updater.test_proxy('default')
 
 # find out the utilities executable path
-adb_path = updater.find_install_dir('Adb')
+adb_dir = updater.find_install_dir('Adb')
 winrar_exec = updater.find_winrar()
 
 # query the remote version
@@ -24,7 +24,7 @@ print('Remote version: %s' % remote_version)
 
 # query the local version
 local_version = None
-with open(os.path.join(adb_path, 'source.properties'), 'r') as f:
+with open(os.path.join(adb_dir, 'source.properties'), 'r') as f:
     content = f.read()
     local_version = re.search(r'Pkg\.Revision=([\d\.]*)', content, flags=re.M).group(1)
 print('Local version: %s' % local_version)
@@ -46,6 +46,6 @@ with tempfile.TemporaryDirectory() as temp_dir:
     updater.extract_archive(winrar_exec, download_path, temp_dir)
     os.remove(download_path)
     deflate_path = glob.glob(os.path.join(temp_dir, 'platform-tools'))[0]
-    shutil.copytree(deflate_path, adb_path, dirs_exist_ok=True)
+    shutil.copytree(deflate_path, adb_dir, dirs_exist_ok=True)
 
 updater.finish()

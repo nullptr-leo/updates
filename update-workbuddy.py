@@ -9,7 +9,7 @@ import updater
 proxy = None
 
 # find out the utilities executable path
-workbuddy_path = updater.find_install_dir(r'WorkBuddy')
+workbuddy_dir = updater.find_install_dir(r'WorkBuddy')
 
 # query the remote version
 print('Querying...')
@@ -24,7 +24,7 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-local_version = updater.get_file_version(os.path.join(workbuddy_path, 'WorkBuddy.exe'))
+local_version = updater.get_file_version(os.path.join(workbuddy_dir, 'WorkBuddy.exe'))
 print('Local version: %s' % local_version)
 
 # check if update is needed

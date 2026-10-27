@@ -8,7 +8,7 @@ import updater
 proxy = updater.test_proxy('default')
 
 # find out the utilities executable path
-gety_path = updater.find_install_dir('Gety')
+gety_dir = updater.find_install_dir('Gety')
 
 # query the remote version
 print('Querying...')
@@ -20,7 +20,7 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-local_version = updater.get_file_version(os.path.join(gety_path, 'Gety.exe'))
+local_version = updater.get_file_version(os.path.join(gety_dir, 'Gety.exe'))
 print('Local version: %s' % local_version)
 
 # check if update is needed

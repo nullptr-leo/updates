@@ -8,7 +8,7 @@ import updater
 proxy = updater.test_proxy('default')
 
 # find out the utilities executable path
-listary_path = updater.find_install_dir('Listary')
+listary_dir = updater.find_install_dir('Listary')
 
 # query the remote version
 print('Querying...')
@@ -20,7 +20,7 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-local_version = updater.get_file_version(os.path.join(listary_path, 'Listary.exe'))
+local_version = updater.get_file_version(os.path.join(listary_dir, 'Listary.exe'))
 print('Local version: %s' % local_version)
 
 # check if update is needed

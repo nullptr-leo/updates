@@ -10,7 +10,7 @@ import updater
 proxy = None
 
 # find out the utilities executable path
-pdfshaper_path = updater.find_install_dir('PDFShaper')
+pdfshaper_dir = updater.find_install_dir('PDFShaper')
 
 # query the remote version
 print('Querying...')
@@ -22,7 +22,7 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-local_version = updater.get_file_version(os.path.join(pdfshaper_path, 'PDFShaper.exe'))
+local_version = updater.get_file_version(os.path.join(pdfshaper_dir, 'PDFShaper.exe'))
 print('Local version: %s' % local_version)
 
 # check if update is needed
@@ -33,6 +33,6 @@ if updater.is_latest(remote_version, local_version):
 print('Preparing...')
 updater.taskkill('PDFShaper.exe')
 updater.open_url('https://www.ghxi.com/pdfshaper.html')
-updater.open_explorer(pdfshaper_path)
+updater.open_explorer(pdfshaper_dir)
 
 updater.finish()

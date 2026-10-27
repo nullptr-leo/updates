@@ -10,7 +10,7 @@ import updater
 proxy = None
 
 # find out the utilities executable path
-otp_path = updater.find_install_dir('Office Tool')
+otp_dir = updater.find_install_dir('Office Tool')
 
 # query the remote version
 print('Querying...')
@@ -22,8 +22,8 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-local_path = os.path.join(otp_path, 'Office Tool Plus.exe')
-local_version = updater.get_file_version(local_path)
+otp_path = os.path.join(otp_dir, 'Office Tool Plus.exe')
+local_version = updater.get_file_version(otp_path)
 print('Local version: %s' % local_version)
 
 # check if update is needed
@@ -32,6 +32,6 @@ if updater.is_latest(remote_version, local_version):
 
 # navigate to download the update
 print('Preparing...')
-updater.open_exe(local_path)
+updater.open_exe(otp_path)
 
 updater.finish()
