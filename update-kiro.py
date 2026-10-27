@@ -15,7 +15,7 @@ kiro_dir = updater.find_install_dir('Kiro')
 print('Querying...')
 try:
     response = updater.query('https://kiro.dev/downloads', proxy=proxy)
-    remote_version = re.search(r'>IDE ([\d\.]+)', response).group(1)
+    remote_version = re.search(r'\\"releases\\":\[{\\"version\\":\\"([\d\.]+)', response).group(1)
 except Exception:
     updater.fail_and_exit()
 print('Remote version: %s' % remote_version)
