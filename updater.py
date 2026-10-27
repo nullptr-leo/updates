@@ -11,8 +11,6 @@ import win32api as win
 import urllib3
 from packaging import version
 
-from winrt.windows.management.deployment import PackageManager
-
 urllib3.disable_warnings()
 
 # Directories to search for installed software
@@ -78,6 +76,7 @@ def get_appx_version(package_name):
     Returns the version string 'major.minor.build.revision'.
     """
     try:
+        from winrt.windows.management.deployment import PackageManager
         pm = PackageManager()
         for package in pm.find_packages():
             if package.id.name == package_name:
