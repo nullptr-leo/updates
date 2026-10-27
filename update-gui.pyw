@@ -45,6 +45,22 @@ S_FAILED = '失败'
 _TERMINAL = {S_UPTODATE, S_SKIPPED, S_DONE, S_FAILED}
 _PCT_RE = re.compile(r'\(([\d.]+)%\)')
 
+# Map specific requests exceptions to a short, user-friendly label so the GUI
+# shows "失败: ReadTimeout" / "失败: ConnectionError" instead of a long
+# exception traceback line.
+_REQUESTS_EXC_LABELS = {
+    'requests.exceptions.ReadTimeout': 'ReadTimeout',
+    'requests.exceptions.ConnectionError': 'ConnectionError',
+}
+
+
+def classify_failure(reason):
+    """Return a short label when the reason mentions a known requests exception."""
+    for needle, label in _REQUESTS_EXC_LABELS.items():
+        if needle in reason:
+            return label
+    return reason
+
 
 def load_ignored():
     """Return the set of ignored program names from update-config.json."""
@@ -465,6 +481,8 @@ class App:
     def _set_row(self, name, status, progress, tag, reason='',
                  local_version='', remote_version=''):
         if status in (S_FAILED, S_SKIPPED) and reason:
+            if status == S_FAILED:
+                reason = classify_failure(reason)
             display = '%s: %s' % (status, reason)
         else:
             display = '%s %s' % (status, progress) if progress else status
