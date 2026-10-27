@@ -40,4 +40,10 @@ with tempfile.TemporaryDirectory() as temp_dir:
     updater.taskkill('Feishu.exe')
     updater.run_installer(download_path)
 
+# remove the stale desktop shortcut named 飞书
+desktop_dir = os.path.join(os.path.expanduser('~'), 'Desktop')
+feishu_shortcut = os.path.join(desktop_dir, '飞书.lnk')
+if os.path.exists(feishu_shortcut):
+    os.remove(feishu_shortcut)
+
 updater.finish()
