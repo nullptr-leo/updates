@@ -10,7 +10,7 @@ import updater
 proxy = updater.test_proxy('default')
 
 # find out the utilities executable path
-snowair_path = updater.find_install_dir('SnowAir')
+snowair_dir = updater.find_install_dir('SnowAir')
 
 # query the remote version
 print('Querying...')
@@ -22,8 +22,9 @@ except Exception:
 print('Remote version: %s' % remote_version)
 
 # query the local version
-local_path = glob.glob(os.path.join(snowair_path, 'SnowAir-Lite-*.exe'))[0]
-local_version = updater.get_file_version(local_path)
+
+snowair_path = os.path.join(snowair_dir, 'SnowAir-Lite.exe')
+local_version = updater.get_file_version(snowair_path)
 print('Local version: %s' % local_version)
 
 # check if update is needed
@@ -32,7 +33,7 @@ if updater.is_latest(remote_version, local_version):
 
 # download package files
 print('Preparing...')
-remote_url = f"https://github.com/CM-idea/SnowAir/releases/download/v{remote_version}-lite/SnowAir-Lite.exe"
+remote_url = f"https://github.com/CM-idea/SnowAir/releases/download/v{remote_version}-lite/SnowAir-Lite-v{remote_version}.exe"
 
 with tempfile.TemporaryDirectory() as temp_dir:
     download_path = os.path.join(temp_dir, "SnowAir-Lite.exe")
@@ -40,6 +41,6 @@ with tempfile.TemporaryDirectory() as temp_dir:
 
     # extract and update files
     updater.taskkill("SnowAir-Lite.exe")
-    shutil.copy(download_path, os.path.join(snowair_path, "SnowAir-Lite.exe"))
+    shutil.copy(download_path, snowair_path)
 
 updater.finish()
