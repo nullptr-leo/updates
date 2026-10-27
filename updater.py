@@ -182,14 +182,14 @@ def open_exe(exe_path):
     os.startfile(exe_path)
 
 
-def is_latest(remote_ver, local_ver):
-    """Return True if the local version is up to date (version.parse comparison)."""
+def is_latest(remote_ver, local_ver, lexicographic=False):
+    """Return True if the local version is up to date.
+    By default versions are compared semantically via packaging.version.parse.
+    Pass lexicographic=True to compare them as plain strings instead.
+    """
+    if lexicographic:
+        return remote_ver <= local_ver
     return version.parse(remote_ver) <= version.parse(local_ver)
-
-
-def is_latest_str(remote_ver, local_ver):
-    """String-based up-to-date check."""
-    return remote_ver <= local_ver
 
 
 def already_latest():
