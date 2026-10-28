@@ -280,11 +280,12 @@ class TrayIcon:
     WM_BRING_TO_FRONT = win32con.WM_USER + 21
     ID_TRAY = 1
 
-    def __init__(self, icon_path, tooltip, on_restore, on_exit):
+    def __init__(self, icon_path, tooltip, on_restore, on_exit, on_update):
         self.icon_path = icon_path
         self.tooltip = tooltip
         self.on_restore = on_restore
         self.on_exit = on_exit
+        self.on_update = on_update
         self.hwnd = None
         self.hicon = None
         self.visible = False
@@ -347,6 +348,7 @@ class TrayIcon:
     def _show_menu(self):
         menu = win32gui.CreatePopupMenu()
         win32gui.AppendMenu(menu, win32con.MF_STRING, 1, '显示窗口')
+        win32gui.AppendMenu(menu, win32con.MF_STRING, 3, '更新软件')
         win32gui.AppendMenu(menu, win32con.MF_STRING, 2, '退出')
         pos = win32api.GetCursorPos()
         win32gui.SetForegroundWindow(self.hwnd)
@@ -356,6 +358,8 @@ class TrayIcon:
         win32gui.DestroyMenu(menu)
         if cmd == 1:
             self.on_restore()
+        elif cmd == 3:
+            self.on_update()
         elif cmd == 2:
             self.on_exit()
 
@@ -451,7 +455,8 @@ class App:
         # system tray icon is always present from startup
         self.tray = TrayIcon(
             self.ico_path, 'Update Scripts',
-            on_restore=self.restore_from_tray, on_exit=self.exit_app)
+            on_restore=self.restore_from_tray, on_exit=self.exit_app,
+            on_update=self.self_update)
         self.tray.show()
 
         self._populate()
@@ -706,6 +711,42 @@ class App:
         self.root.lift()
         self.root.focus_force()
 
+    def self_update(self):
+        """Update this script set via `git pull --rebase` in the background."""
+        threading.Thread(target=self._self_update_task, daemon=True).start()
+
+    def _self_update_task(self):
+        # bring the window to front so the status text is visible
+        self.root.after(0, self.restore_from_tray)
+        self.root.after(0, lambda: self.summary.config(text='正在更新'))
+        output = ''
+        try:
+            no_window = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+            result = subprocess.run(
+                ['git', 'pull', '--rebase'],
+                cwd=SCRIPT_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, creationflags=no_window)
+            output = result.stdout or ''
+            if result.returncode != 0:
+                if 'unstaged changes' in output.lower():
+                    output = 'Unstaged changes'
+                raise RuntimeError('升级失败')
+            if 'up to date' in output.lower():
+                self.root.after(0, lambda: self.summary.config(text='已是最新版本'))
+            else:
+                self.root.after(0, lambda: self.summary.config(text='升级成功'))
+                # wait 3 seconds, then relaunch the GUI with the new code
+                self.root.after(3000, restart_program)
+        except Exception as e:
+            # show the failure info on the UI, at the same place as "正在更新"
+            detail = output.strip() or str(e)
+            self.root.after(
+                0, lambda: self.summary.config(text='升级失败: ' + detail, wraplength=520))
+            # also log to console for debugging
+            print('升级失败')
+            print(detail)
+            traceback.print_exc()
+
     def exit_app(self):
         """Quit the application from the tray menu."""
         self.quit_app()
@@ -767,10 +808,36 @@ def _activate_existing_instance():
             pass
 
 
+_app_mutex = None
+
+
+def _close_mutex():
+    """Release the single-instance mutex (idempotent)."""
+    global _app_mutex
+    if _app_mutex is not None:
+        try:
+            win32api.CloseHandle(_app_mutex)
+        except Exception:
+            pass
+        _app_mutex = None
+
+
+def restart_program():
+    """Launch a fresh instance of this GUI and exit the current one."""
+    _close_mutex()
+    subprocess.Popen(
+        [sys.executable, '-u', os.path.abspath(__file__)],
+        cwd=SCRIPT_DIR,
+        creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,
+    )
+    sys.exit(0)
+
+
 def main():
     # Enforce a single running instance via a named mutex.
+    global _app_mutex
     mutex_name = 'UpdateScriptsGuiSingleInstance'
-    mutex = win32event.CreateMutex(None, False, mutex_name)
+    _app_mutex = win32event.CreateMutex(None, False, mutex_name)
     if win32api.GetLastError() == winerror.ERROR_ALREADY_EXISTS:
         # Another instance is running: ask it to restore and bring to front.
         _activate_existing_instance()
@@ -784,7 +851,7 @@ def main():
         App(root)
         root.mainloop()
     finally:
-        win32api.CloseHandle(mutex)
+        _close_mutex()
 
 
 if __name__ == '__main__':
