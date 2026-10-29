@@ -524,16 +524,21 @@ class App:
         return 'running'
 
     def _set_row(self, name, status, progress, tag, reason='',
-                 local_version='', remote_version=''):
-        if status in (S_FAILED, S_SKIPPED) and reason:
-            if status == S_FAILED:
-                reason = classify_failure(reason)
-            display = '%s: %s' % (status, reason)
-        else:
-            display = '%s %s' % (status, progress) if progress else status
+                 local_version=None, remote_version=None):
         for item in self.tree.get_children(''):
             vals = self.tree.item(item, 'values')
             if vals[0] == name:
+                # keep the existing version columns unless explicitly supplied
+                if local_version is None:
+                    local_version = vals[1]
+                if remote_version is None:
+                    remote_version = vals[2]
+                if status in (S_FAILED, S_SKIPPED) and reason:
+                    if status == S_FAILED:
+                        reason = classify_failure(reason)
+                    display = '%s: %s' % (status, reason)
+                else:
+                    display = '%s %s' % (status, progress) if progress else status
                 self.tree.item(item, values=(name, local_version, remote_version, display),
                                tags=(tag,))
                 return
@@ -559,7 +564,7 @@ class App:
             task = ScriptTask(name, path)
             self.tasks[name] = task
             self.active_tasks.add(name)
-            self._set_row(name, S_QUERYING, '', 'running')
+            self._set_row(name, S_QUERYING, '', 'running', local_version='', remote_version='')
             threading.Thread(target=task.run, args=(self.msg_queue,), daemon=True).start()
 
         self._ensure_processing()
@@ -579,7 +584,7 @@ class App:
         self.tasks[name] = task
         self.active_tasks.add(name)
         self._update_session_active = True
-        self._set_row(name, S_QUERYING, '', 'running')
+        self._set_row(name, S_QUERYING, '', 'running', local_version='', remote_version='')
         self.update_all_btn.config(state='disabled')
         threading.Thread(target=task.run, args=(self.msg_queue,), daemon=True).start()
         self._ensure_processing()
@@ -817,17 +822,21 @@ class App:
                 0, lambda: self._set_drop_status(
                     '未匹配到对应的应用：%s' % os.path.basename(path)))
             return
-        app_name = getattr(target, '__name__', '?')
-        if app_name.startswith('update_'):
-            app_name = app_name[len('update_'):]
+        app_name = pretty_name(target.__name__ + '.py')
         self.root.after(0, lambda: self._set_drop_status('正在安装 %s ...' % app_name))
+        # reflect the install state in the app list as well (UI thread)
+        self.root.after(0, lambda: self._set_row(app_name, S_INSTALLING, '', 'running'))
         try:
             target.install_archive(path, entries)
             self.root.after(0, lambda: self._set_drop_status('安装完成：%s' % app_name))
+            self.root.after(0, lambda: self._set_row(app_name, S_DONE, '', 'done'))
         except Exception as e:
             print('安装失败:', e)
             traceback.print_exc()
+            reason = str(e) or repr(e)
             self.root.after(0, lambda: self._set_drop_status('安装失败：%s' % app_name))
+            self.root.after(
+                0, lambda r=reason: self._set_row(app_name, S_FAILED, '', 'failed', reason=r))
 
     def self_update(self):
         """Update this script set via `git pull --rebase` in the background."""
