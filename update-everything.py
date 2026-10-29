@@ -5,51 +5,55 @@ import tempfile
 
 import updater
 
-# proxy
-proxy = updater.test_proxy('default')
+def update_app():
+    # proxy
+    proxy = updater.test_proxy('default')
 
-# find out the utilities executable path
-everything_dir = updater.find_install_dir('Everything')
-winrar_exec = updater.find_winrar()
+    # find out the utilities executable path
+    everything_dir = updater.find_install_dir('Everything')
+    winrar_exec = updater.find_winrar()
 
-# query the remote version
-print('Querying...')
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
-    'Accept-Encoding': 'gzip, deflate',
-}
+    # query the remote version
+    print('Querying...')
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
+        'Accept-Encoding': 'gzip, deflate',
+    }
 
-try:
-    response = updater.query('https://www.voidtools.com/downloads/', headers=headers, proxy=proxy)
-    # collect every 64-bit zip installer version from the download page
-    versions = re.findall(r'Everything\-([\d.]+[ab])?\.x64\.zip', response)
-    if not versions:
-        raise ValueError('未找到 Everything 下载链接')
-    remote_version = str(max(versions, key=lambda v: updater.version.parse(v)))
-except Exception:
-    updater.fail_and_exit()
-print('Remote version: %s' % remote_version)
+    try:
+        response = updater.query('https://www.voidtools.com/downloads/', headers=headers, proxy=proxy)
+        # collect every 64-bit zip installer version from the download page
+        versions = re.findall(r'Everything\-([\d.]+[ab])?\.x64\.zip', response)
+        if not versions:
+            raise ValueError('未找到 Everything 下载链接')
+        remote_version = str(max(versions, key=lambda v: updater.version.parse(v)))
+    except Exception:
+        updater.fail_and_exit()
+    print('Remote version: %s' % remote_version)
 
-# query the local version
-local_version = updater.get_file_version(os.path.join(everything_dir, 'Everything.exe'))
-print('Local version: %s' % local_version)
+    # query the local version
+    local_version = updater.get_file_version(os.path.join(everything_dir, 'Everything.exe'))
+    print('Local version: %s' % local_version)
 
-# check if update is needed
-if updater.is_latest(remote_version, local_version):
-    updater.already_latest()
+    # check if update is needed
+    if updater.is_latest(remote_version, local_version):
+        updater.already_latest()
 
-# download package files
-print('Preparing...')
-remote_url = 'https://www.voidtools.com/Everything-' + remote_version + '.x64.zip'
+    # download package files
+    print('Preparing...')
+    remote_url = 'https://www.voidtools.com/Everything-' + remote_version + '.x64.zip'
 
-with tempfile.TemporaryDirectory() as temp_dir:
-    download_path = os.path.join(temp_dir, remote_version + '.zip')
-    updater.download(remote_url, download_path, proxy=proxy)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        download_path = os.path.join(temp_dir, remote_version + '.zip')
+        updater.download(remote_url, download_path, proxy=proxy)
 
-    # extract and update files
-    updater.taskkill('Everything.exe')
-    updater.extract_archive(winrar_exec, download_path, temp_dir)
-    os.remove(download_path)
-    shutil.copytree(temp_dir, everything_dir, dirs_exist_ok=True)
+        # extract and update files
+        updater.taskkill('Everything.exe')
+        updater.extract_archive(winrar_exec, download_path, temp_dir)
+        os.remove(download_path)
+        shutil.copytree(temp_dir, everything_dir, dirs_exist_ok=True)
 
-updater.finish()
+    updater.finish()
+
+if __name__ == '__main__':
+    update_app()

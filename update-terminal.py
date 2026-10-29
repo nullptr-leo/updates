@@ -3,31 +3,35 @@ import re
 
 import updater
 
-# proxy
-proxy = updater.test_proxy('default')
+def update_app():
+    # proxy
+    proxy = updater.test_proxy('default')
 
-# query the remote version
-print('Querying...')
-try:
-    response = updater.query('https://github.com/microsoft/terminal/releases/latest', proxy=proxy)
-    remote_version = re.search(r'Windows Terminal v([\d\.]*)', response, flags=re.M | re.I).group(1)
-except Exception:
-    updater.fail_and_exit()
-print('Remote version: %s' % remote_version)
+    # query the remote version
+    print('Querying...')
+    try:
+        response = updater.query('https://github.com/microsoft/terminal/releases/latest', proxy=proxy)
+        remote_version = re.search(r'Windows Terminal v([\d\.]*)', response, flags=re.M | re.I).group(1)
+    except Exception:
+        updater.fail_and_exit()
+    print('Remote version: %s' % remote_version)
 
-# query the local version
-local_version = updater.get_appx_version('Microsoft.WindowsTerminal')
-print('Local version: %s' % local_version)
+    # query the local version
+    local_version = updater.get_appx_version('Microsoft.WindowsTerminal')
+    print('Local version: %s' % local_version)
 
-# check if update is needed
-if updater.is_latest(remote_version, local_version):
-    updater.already_latest()
+    # check if update is needed
+    if updater.is_latest(remote_version, local_version):
+        updater.already_latest()
 
-# download package files
-print('Preparing...')
-remote_url = f'https://github.com/microsoft/terminal/releases/download/v{remote_version}/Microsoft.WindowsTerminal_{remote_version}_8wekyb3d8bbwe.msixbundle'
-desktop_dir = os.path.join(os.path.expanduser('~'), 'Desktop')
-download_path = os.path.join(desktop_dir, remote_version + '.msixbundle')
-updater.download(remote_url, download_path, proxy=proxy)
+    # download package files
+    print('Preparing...')
+    remote_url = f'https://github.com/microsoft/terminal/releases/download/v{remote_version}/Microsoft.WindowsTerminal_{remote_version}_8wekyb3d8bbwe.msixbundle'
+    desktop_dir = os.path.join(os.path.expanduser('~'), 'Desktop')
+    download_path = os.path.join(desktop_dir, remote_version + '.msixbundle')
+    updater.download(remote_url, download_path, proxy=proxy)
 
-updater.finish()
+    updater.finish()
+
+if __name__ == '__main__':
+    update_app()
