@@ -49,8 +49,8 @@ _PCT_RE = re.compile(r'\(([\d.]+)%\)')
 # shows "失败: ReadTimeout" / "失败: ConnectionError" instead of a long
 # exception traceback line.
 _REQUESTS_EXC_LABELS = {
-    'requests.exceptions.ReadTimeout': 'ReadTimeout',
-    'requests.exceptions.ConnectionError': 'ConnectionError',
+    'requests.exceptions.ReadTimeout': '网络错误',
+    'requests.exceptions.ConnectionError': '网络错误',
 }
 
 
