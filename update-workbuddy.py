@@ -43,6 +43,9 @@ def update_app():
         updater.taskkill('WorkBuddy.exe')
         updater.run_installer(download_path)
 
+    # remove the stale desktop shortcut named WorkBuddy
+    updater.remove_desktop_shortcut('WorkBuddy')
+
     updater.finish()
 
 if __name__ == '__main__':
