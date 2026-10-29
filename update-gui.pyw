@@ -497,6 +497,9 @@ class App:
         self._populate()
         self._summary_default = '共 %d 个软件' % len(self.scripts)
         self._update_modules = None
+        # method 1: tell python (console) from pythonw (no console) by the
+        # interpreter executable name.
+        self._is_pythonw = os.path.basename(sys.executable).lower() == 'pythonw.exe'
         root.protocol('WM_DELETE_WINDOW', self.on_close)
 
     def _populate(self):
@@ -869,7 +872,14 @@ class App:
         self.quit_app()
 
     def on_close(self):
-        """Closing the window minimizes to tray instead of quitting."""
+        """Close behavior depends on how the GUI was launched.
+
+        - pythonw (no console): minimize to tray (existing behavior).
+        - python  (console):    quit the application directly.
+        """
+        if not self._is_pythonw:
+            self.quit_app()
+            return
         if self.tray is not None:
             self.minimize_to_tray()
         else:
