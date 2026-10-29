@@ -210,6 +210,20 @@ def open_exe(exe_path):
     os.startfile(exe_path)
 
 
+def remove_desktop_shortcut(name):
+    """Delete a desktop shortcut (.lnk) from the current user's Desktop.
+
+    `name` may include or omit the '.lnk' extension. If the shortcut does not
+    exist, this is a no-op (no error raised).
+    """
+    if not name.lower().endswith('.lnk'):
+        name += '.lnk'
+    desktop_dir = os.path.join(os.path.expanduser('~'), 'Desktop')
+    shortcut = os.path.join(desktop_dir, name)
+    if os.path.exists(shortcut):
+        os.remove(shortcut)
+
+
 def is_latest(remote_ver, local_ver, lexicographic=False):
     """Return True if the local version is up to date.
     By default versions are compared semantically via packaging.version.parse.

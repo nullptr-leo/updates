@@ -41,10 +41,7 @@ def update_app():
         updater.run_installer(download_path)
 
     # remove the stale desktop shortcut named XMind
-    desktop_dir = os.path.join(os.path.expanduser('~'), 'Desktop')
-    xmind_shortcut = os.path.join(desktop_dir, 'XMind.lnk')
-    if os.path.exists(xmind_shortcut):
-        os.remove(xmind_shortcut)
+    updater.remove_desktop_shortcut('XMind')
 
     updater.finish()
 
