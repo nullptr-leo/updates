@@ -738,10 +738,12 @@ class App:
                 # wait 3 seconds, then relaunch the GUI with the new code
                 self.root.after(3000, restart_program)
         except Exception as e:
-            # show the failure info on the UI, at the same place as "正在更新"
+            # show the failure info on the UI (single line, no wrapping),
+            # at the same place as "正在更新"
             detail = output.strip() or str(e)
+            detail = ' '.join(detail.splitlines())
             self.root.after(
-                0, lambda: self.summary.config(text='升级失败: ' + detail, wraplength=520))
+                0, lambda: self.summary.config(text='升级失败: ' + detail))
             # also log to console for debugging
             print('升级失败')
             print(detail)
