@@ -159,7 +159,7 @@ def taskkill(image_name):
 
 def extract_archive(winrar_exec, archive_path, dest_dir):
     """Extract an archive using WinRAR."""
-    subprocess.call([winrar_exec, 'x', '-o+-', '-inul', archive_path, dest_dir],
+    subprocess.call([winrar_exec, 'x', '-o+-', '-inul', '-ibck', archive_path, dest_dir],
                     creationflags=subprocess.CREATE_NO_WINDOW)
 
 
