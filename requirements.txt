@@ -5,3 +5,6 @@ winrt-runtime
 winrt-Windows.Foundation.Collections
 winrt-Windows.Management.Deployment
 winrt-Windows.ApplicationModel
+tkinterdnd2
+py7zr
+unrar

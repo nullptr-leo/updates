@@ -6,6 +6,7 @@ launches every update-*.py concurrently and parses their stdout in real
 time to update the list.
 """
 import glob
+import importlib
 import json
 import logging
 import os
@@ -27,6 +28,13 @@ import win32con
 import win32event
 import win32gui
 import winerror
+
+# Drag & drop support (optional; GUI still runs if tkinterdnd2 is missing).
+try:
+    from tkinterdnd2 import DND_FILES, TkinterDnD
+except Exception:
+    DND_FILES = None
+    TkinterDnD = None
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(SCRIPT_DIR, 'update-config.json')
@@ -364,6 +372,28 @@ class TrayIcon:
             self.on_exit()
 
 
+def load_update_modules():
+    """Import every update-*.py as a module.
+
+    A module is only usable for drag-drop dispatch when it exposes BOTH
+    `match_archive` and `install_archive`; the caller skips the rest.
+    Each script guards its update logic behind `if __name__ == '__main__'`,
+    so importing it here does not run the update.
+    """
+    modules = []
+    for path in glob.glob(os.path.join(SCRIPT_DIR, 'update-*.py')):
+        name = os.path.splitext(os.path.basename(path))[0]
+        try:
+            spec = importlib.util.spec_from_file_location(name, path)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+        except Exception:
+            traceback.print_exc()
+            continue
+        modules.append(mod)
+    return modules
+
+
 class App:
     def __init__(self, root):
         self.root = root
@@ -459,7 +489,14 @@ class App:
             on_update=self.self_update)
         self.tray.show()
 
+        # drag & drop an archive onto the window (requires tkinterdnd2)
+        if TkinterDnD is not None:
+            self.root.drop_target_register(DND_FILES)
+            self.root.dnd_bind('<<Drop>>', self._on_drop)
+
         self._populate()
+        self._summary_default = '共 %d 个软件' % len(self.scripts)
+        self._update_modules = None
         root.protocol('WM_DELETE_WINDOW', self.on_close)
 
     def _populate(self):
@@ -711,6 +748,84 @@ class App:
         self.root.lift()
         self.root.focus_force()
 
+    # ----- drag & drop an archive onto the window -----
+    def _on_drop(self, event):
+        for path in self._parse_drop_paths(event.data):
+            self._handle_dropped_archive(path)
+
+    @staticmethod
+    def _parse_drop_paths(data):
+        data = (data or '').strip()
+        if not data:
+            return []
+        if data.startswith('{') and data.endswith('}'):
+            return [data[1:-1]]
+        return data.split()
+
+    def _handle_dropped_archive(self, path):
+        lower = path.lower()
+        if not lower.endswith(('.zip', '.7z', '.rar')):
+            self._flash_drop_status('不是压缩文件：%s' % os.path.basename(path))
+            return
+        threading.Thread(target=self._list_archive_task, args=(path,), daemon=True).start()
+
+    def _list_archive_task(self, path):
+        try:
+            entries = updater.list_archive(path)
+        except Exception as e:
+            print('读取压缩包失败:', e)
+            traceback.print_exc()
+            self.root.after(
+                0, lambda: self._flash_drop_status('读取压缩包失败：%s' % os.path.basename(path)))
+            return
+        print('压缩包内容 (%s):' % path)
+        for name in entries:
+            print('  ' + name)
+        self.root.after(
+            0, lambda: self._flash_drop_status(
+                '已读取 %s，共 %d 项' % (os.path.basename(path), len(entries))))
+        # hand off to the matching app's install_archive
+        threading.Thread(
+            target=self._dispatch_archive, args=(path, entries), daemon=True).start()
+
+    def _flash_drop_status(self, text):
+        self._set_drop_status(text)
+
+    def _set_drop_status(self, text):
+        self.summary.config(text=text)
+
+    def _dispatch_archive(self, path, entries):
+        if self._update_modules is None:
+            self._update_modules = load_update_modules()
+        target = None
+        for mod in self._update_modules:
+            # only consider apps that expose BOTH interfaces; skip the rest
+            if not (hasattr(mod, 'match_archive') and hasattr(mod, 'install_archive')):
+                continue
+            try:
+                if mod.match_archive(entries):
+                    target = mod
+                    break
+            except Exception:
+                traceback.print_exc()
+                continue
+        if target is None:
+            self.root.after(
+                0, lambda: self._set_drop_status(
+                    '未匹配到对应的应用：%s' % os.path.basename(path)))
+            return
+        app_name = getattr(target, '__name__', '?')
+        if app_name.startswith('update_'):
+            app_name = app_name[len('update_'):]
+        self.root.after(0, lambda: self._set_drop_status('正在安装 %s ...' % app_name))
+        try:
+            target.install_archive(path, entries)
+            self.root.after(0, lambda: self._set_drop_status('安装完成：%s' % app_name))
+        except Exception as e:
+            print('安装失败:', e)
+            traceback.print_exc()
+            self.root.after(0, lambda: self._set_drop_status('安装失败：%s' % app_name))
+
     def self_update(self):
         """Update this script set via `git pull --rebase` in the background."""
         threading.Thread(target=self._self_update_task, daemon=True).start()
@@ -845,7 +960,7 @@ def main():
         _activate_existing_instance()
         return
     try:
-        root = tk.Tk()
+        root = TkinterDnD.Tk() if TkinterDnD is not None else tk.Tk()
         try:
             ttk.Style().theme_use('clam')
         except tk.TclError:

@@ -4,6 +4,7 @@ import sys
 import time
 import traceback
 import subprocess
+import zipfile
 from contextlib import closing
 
 import requests
@@ -160,6 +161,33 @@ def extract_archive(winrar_exec, archive_path, dest_dir):
     """Extract an archive using WinRAR."""
     subprocess.call([winrar_exec, 'x', '-o+-', '-inul', archive_path, dest_dir],
                     creationflags=subprocess.CREATE_NO_WINDOW)
+
+
+def list_archive(archive_path):
+    """Return the internal entry paths of an archive as a list of strings.
+
+    Paths are normalized to use '/' as the separator so callers can parse the
+    structure without caring about the archive format.
+    Supported formats: .zip (stdlib), .7z (py7zr), .rar (unrar library, no
+    command line). For .rar it reads the entry table via the `unrar` library
+    (ctypes, no subprocess); an error is raised if `unrar`/UnRAR64.dll is missing.
+    """
+    lower = archive_path.lower()
+    if lower.endswith('.zip'):
+        with zipfile.ZipFile(archive_path) as z:
+            return [e.replace('\\', '/') for e in z.namelist()]
+    if lower.endswith('.7z'):
+        import py7zr
+        with py7zr.SevenZipFile(archive_path) as z:
+            return [e.replace('\\', '/') for e in z.getnames()]
+    if lower.endswith('.rar'):
+        # Point the loader at UnRAR64.dll placed next to this script.
+        os.environ['UNRAR_LIB_PATH'] = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), 'UnRAR64.dll')
+        from unrar.rarfile import RarFile
+        with RarFile(archive_path) as z:
+            return [e.replace('\\', '/') for e in z.namelist()]
+    raise ValueError('不支持的压缩格式: %s' % archive_path)
 
 
 def run_installer(installer_path):
