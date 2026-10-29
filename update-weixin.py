@@ -5,7 +5,31 @@ import shutil
 import tempfile
 
 import html
+import traceback
 import updater
+
+def remove_old_version_dirs(install_dir):
+    """Remove all but the newest numeric version subdirectories in install_dir.
+
+    A 'version directory' is a folder whose name is a version string like
+    '3.9.10'. When more than one exists, keep only the highest and delete the
+    rest, so stale versions don't pile up.
+    """
+    version_paths = []
+    for name in os.listdir(install_dir):
+        full = os.path.join(install_dir, name)
+        if not os.path.isdir(full):
+            continue
+        if re.match(r'^(\d+(?:\.\d+)*)$', name):
+            try:
+                version_paths.append((updater.version.parse(name), full))
+            except Exception:
+                pass
+    if len(version_paths) >= 2:
+        version_paths.sort(key=lambda t: t[0])
+        for _, full in version_paths[:-1]:
+            print('Removing old version directory: %s' % full)
+            shutil.rmtree(full, ignore_errors=True)
 
 def update_app():
     # proxy
@@ -15,22 +39,7 @@ def update_app():
     weixin_dir = updater.find_install_dir(r'Tencent\Weixin')
 
     # remove old version directories
-    version_paths = []
-    for _name in os.listdir(weixin_dir):
-        _full = os.path.join(weixin_dir, _name)
-        if not os.path.isdir(_full):
-            continue
-        _m = re.match(r'^(\d+(?:\.\d+)*)$', _name)
-        if _m:
-            try:
-                version_paths.append((updater.version.parse(_name), _full))
-            except Exception:
-                pass
-    if len(version_paths) >= 2:
-        version_paths.sort(key=lambda t: t[0])
-        for _, _full in version_paths[:-1]:
-            print('Removing old version directory: %s' % _full)
-            shutil.rmtree(_full, ignore_errors=True)
+    remove_old_version_dirs(weixin_dir)
 
     # query the remote version
     print('Querying...')
@@ -64,6 +73,28 @@ def update_app():
     # updater.open_explorer(weixin_dir)
 
     updater.finish()
+
+def match_archive(entries):
+    for name in entries:
+        n = name.replace('\\', '/')
+        if n == 'Weixin' or n.startswith('Weixin/'):
+            return True
+    return False
+
+def install_archive(archive_path, entries):
+    # locate paths (convert the updater's sys.exit into a catchable error)
+    weixin_dir = updater.find_install_dir(r'Tencent\Weixin')
+    winrar_exec = updater.find_winrar()
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # extraction failure -> stop here, leave the existing install untouched
+        updater.taskkill('Weixin.exe')
+        updater.extract_archive(winrar_exec, archive_path, temp_dir)
+        deflate_path = glob.glob(os.path.join(temp_dir, 'Weixin'))[0]
+        shutil.copytree(deflate_path, weixin_dir, dirs_exist_ok=True)
+
+        # remove old version directories
+        remove_old_version_dirs(weixin_dir)
 
 if __name__ == '__main__':
     update_app()
