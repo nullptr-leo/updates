@@ -467,6 +467,10 @@ class App:
         self.tray = None
         self._auto_timer = None
         self._update_session_active = False
+        # True while a self-update (git pull) is in progress; while set, normal
+        # update-progress UI is suppressed so it can't clobber the restart
+        # countdown text.
+        self._self_updating = False
 
         # --- top bar ---
         top = ttk.Frame(root)
@@ -724,19 +728,30 @@ class App:
         try:
             while True:
                 msg = self.msg_queue.get_nowait()
-                tag = self._tag_for(msg['status'])
-                self._set_row(msg['name'], msg['status'], msg.get('progress', ''),
-                              tag, msg.get('reason', ''),
-                              msg.get('local_version', ''), msg.get('remote_version', ''))
-                if msg['status'] == S_FAILED and msg.get('done'):
-                    self._log_failure(msg['name'], msg.get('reason', ''),
-                                      msg.get('detail', ''))
+                if not self._self_updating:
+                    tag = self._tag_for(msg['status'])
+                    self._set_row(msg['name'], msg['status'], msg.get('progress', ''),
+                                  tag, msg.get('reason', ''),
+                                  msg.get('local_version', ''), msg.get('remote_version', ''))
+                    if msg['status'] == S_FAILED and msg.get('done'):
+                        self._log_failure(msg['name'], msg.get('reason', ''),
+                                          msg.get('detail', ''))
                 if msg.get('done'):
                     self.active_tasks.discard(msg['name'])
                     if self.running:
                         self.completed += 1
         except queue.Empty:
             pass
+
+        if self._self_updating:
+            # a self-update is in progress: keep the queue drained and the
+            # bookkeeping coherent, but suppress all update-progress UI (rows and
+            # summary) so it doesn't clobber the '升级成功，即将重启' countdown.
+            if self.running and self.completed >= self.total:
+                self.running = False
+            if self.active_tasks:
+                self.root.after(100, self._process_queue)
+            return
 
         if self.active_tasks:
             self.update_all_btn.config(state='disabled')
@@ -881,6 +896,7 @@ class App:
 
     def self_update(self):
         """Update this script set via `git pull --rebase` in the background."""
+        self._self_updating = True
         threading.Thread(target=self._self_update_task, daemon=True).start()
 
     def _self_update_task(self):
@@ -905,15 +921,15 @@ class App:
                 # before this instance launched). If so, relaunch after 3s.
                 current = get_git_version()
                 if current != self.current_version:
-                    self.root.after(0, lambda: self.summary.config(text='升级成功，即将重启'))
-                    self.root.after(3000, restart_program)
+                    self.root.after(0, self._self_update_countdown, 3)
                 else:
                     self.root.after(0, lambda: self.summary.config(text='已是最新版本'))
             else:
-                self.root.after(0, lambda: self.summary.config(text='升级成功，即将重启'))
-                # wait 3 seconds, then relaunch the GUI with the new code
-                self.root.after(3000, restart_program)
+                # show a 1-second countdown, then relaunch the GUI with new code
+                self.root.after(0, self._self_update_countdown, 3)
         except Exception as e:
+            # self-update failed: let normal updates show progress again
+            self._self_updating = False
             # show the failure info on the UI (single line, no wrapping),
             # at the same place as "正在更新"
             detail = output.strip() or str(e)
@@ -924,6 +940,14 @@ class App:
             print('升级失败')
             print(detail)
             traceback.print_exc()
+
+    def _self_update_countdown(self, remaining):
+        """Show a per-second 'restarting soon' countdown, then relaunch."""
+        if remaining > 0:
+            self.summary.config(text='升级成功，即将重启 (%ds)' % remaining)
+            self.root.after(1000, self._self_update_countdown, remaining - 1)
+        else:
+            restart_program()
 
     def exit_app(self):
         """Quit the application from the tray menu."""
