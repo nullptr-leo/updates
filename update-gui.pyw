@@ -52,6 +52,8 @@ S_FAILED = '失败'
 
 _TERMINAL = {S_UPTODATE, S_SKIPPED, S_DONE, S_FAILED}
 _PCT_RE = re.compile(r'\(([\d.]+)%\)')
+# Matches 'Download: 3.45MB / 6.78MB (50.91%)' -> cur, total, pct
+_DL_RE = re.compile(r'Download:\s*([\d.]+)MB(?:\s*/\s*([\d.]+)MB)?\s*\(([\d.]+)%\)')
 
 # Map specific requests exceptions to a short, user-friendly label so the GUI
 # shows "失败: ReadTimeout" / "失败: ConnectionError" instead of a long
@@ -224,16 +226,22 @@ class ScriptTask:
         elif 'Preparing' in seg:
             self._emit(msg_queue, S_PREPARING, '')
         elif 'Download:' in seg:
-            m = _PCT_RE.search(seg)
+            m = _DL_RE.search(seg)
             if m:
-                pct = float(m.group(1))
+                cur_mb = float(m.group(1))
+                total_mb = float(m.group(2)) if m.group(2) else 0.0
+                pct = float(m.group(3))
                 self.seen_download = True
                 # throttle: only emit when the percent changed by >= 1
                 if (self.last_emitted_pct is None
                         or abs(pct - self.last_emitted_pct) >= 1.0
                         or pct >= 99.9):
                     self.last_emitted_pct = pct
-                    self._emit(msg_queue, S_DOWNLOADING, '%.1f%%' % pct)
+                    if total_mb:
+                        progress = '%.1f%% (%.1fM/%.1fM)' % (pct, cur_mb, total_mb)
+                    else:
+                        progress = '%.1f%% (%.1fM)' % (pct, cur_mb)
+                    self._emit(msg_queue, S_DOWNLOADING, progress)
                 if pct >= 99.9:
                     self._emit(msg_queue, S_INSTALLING, '')
             else:

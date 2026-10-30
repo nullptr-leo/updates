@@ -142,7 +142,9 @@ def download(url, dest_path, proxy=None):
                 data_count += len(data)
                 if content_size:
                     progress = (data_count / content_size) * 100
-                    print('Download: %.2fMB (%.2f%%)' % (data_count / 1024 / 1024, progress), end='\r')
+                    print('Download: %.2fMB / %.2fMB (%.2f%%)' % (
+                        data_count / 1024 / 1024,
+                        content_size / 1024 / 1024, progress), end='\r')
                 else:
                     print('Download: %.2fMB' % (data_count / 1024 / 1024), end='\r')
 
