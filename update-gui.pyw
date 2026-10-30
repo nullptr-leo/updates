@@ -97,6 +97,28 @@ def add_ignored(name):
             json.dump(cfg, f, ensure_ascii=False, indent=2)
 
 
+def load_auto_update():
+    """Return whether scheduled (periodic) updates are enabled, from config."""
+    try:
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            cfg = json.load(f)
+        return bool(cfg.get('auto_update', False))
+    except (OSError, ValueError):
+        return False
+
+
+def set_auto_update(enabled):
+    """Persist the scheduled-update enabled flag to update-config.json."""
+    try:
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            cfg = json.load(f)
+    except (OSError, ValueError):
+        cfg = {}
+    cfg['auto_update'] = bool(enabled)
+    with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+
 def find_scripts():
     """Return sorted [(filename, path)] of update-*.py in the script dir."""
     ignored = load_ignored()
@@ -454,9 +476,14 @@ class App:
         self.update_all_btn = ttk.Button(top, text='更新全部', command=self.update_all)
         self.update_all_btn.pack(side='right')
         self.auto_var = tk.BooleanVar(value=False)
+        auto_enabled = load_auto_update()
+        self.auto_var.set(auto_enabled)
         self.auto_chk = ttk.Checkbutton(
             top, text='定时更新', variable=self.auto_var, command=self.on_auto_toggle)
         self.auto_chk.pack(side='right', padx=(0, 8))
+        if auto_enabled:
+            # run one pass immediately at startup, then keep the 10-min cycle
+            self.root.after(0, self._auto_update)
         self.last_update_lbl = ttk.Label(top, text='上次更新：—')
         self.last_update_lbl.pack(side='right', padx=(0, 8))
 
@@ -740,8 +767,11 @@ class App:
             self.tray.show()
 
     def on_auto_toggle(self):
-        """Start or stop the periodic update timer based on the checkbox."""
-        if self.auto_var.get():
+        """Start or stop the periodic update timer based on the checkbox,
+        and persist the new state to the config file."""
+        enabled = self.auto_var.get()
+        set_auto_update(enabled)
+        if enabled:
             self._schedule_auto_update()
         else:
             self._cancel_auto_update()
