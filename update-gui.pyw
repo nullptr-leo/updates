@@ -417,6 +417,9 @@ class App:
         if count and date:
             title += f" - rev.{count} ({date.split()[0]})"
         root.title(title)
+        # version shown in the title bar at startup; used by self-update to
+        # detect a stale running process after a pull
+        self.current_version = (count, date)
 
         # Set size and centered position
         sw = root.winfo_screenwidth()
@@ -867,9 +870,17 @@ class App:
                     output = 'Unstaged changes'
                 raise RuntimeError('升级失败')
             if 'up to date' in output.lower():
-                self.root.after(0, lambda: self.summary.config(text='已是最新版本'))
+                # Even when nothing was fetched, the running process may be
+                # stale relative to the files on disk (e.g. pulled externally
+                # before this instance launched). If so, relaunch after 3s.
+                current = get_git_version()
+                if current != self.current_version:
+                    self.root.after(0, lambda: self.summary.config(text='升级成功，即将重启'))
+                    self.root.after(3000, restart_program)
+                else:
+                    self.root.after(0, lambda: self.summary.config(text='已是最新版本'))
             else:
-                self.root.after(0, lambda: self.summary.config(text='升级成功'))
+                self.root.after(0, lambda: self.summary.config(text='升级成功，即将重启'))
                 # wait 3 seconds, then relaunch the GUI with the new code
                 self.root.after(3000, restart_program)
         except Exception as e:
