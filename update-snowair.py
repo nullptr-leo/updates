@@ -34,7 +34,7 @@ def update_app():
 
     # download package files
     print('Preparing...')
-    remote_url = f'https://github.com/CM-idea/SnowAir/releases/download/v{remote_version}-lite/SnowAir-Lite-v{remote_version}.exe'
+    remote_url = f'https://github.com/CM-idea/SnowAir/releases/download/v{remote_version}-lite/SnowAir-Lite.exe'
 
     with tempfile.TemporaryDirectory() as temp_dir:
         download_path = os.path.join(temp_dir, 'SnowAir-Lite.exe')
