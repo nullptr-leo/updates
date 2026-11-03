@@ -149,14 +149,39 @@ def download(url, dest_path, proxy=None):
                     print('Download: %.2fMB' % (data_count / 1024 / 1024), end='\r')
 
 
-def taskkill(image_name):
-    """Kill a running process by image name."""
+def _process_running(image_name):
+    """Return True if a process with the given image name is still running."""
+    try:
+        out = subprocess.check_output(
+            ['tasklist', '/FI', 'IMAGENAME eq %s' % image_name, '/NH'],
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        ).decode('utf-8', errors='replace')
+    except Exception:
+        return False
+    # When a process matches, tasklist prints its image name on the row; when
+    # none match it only prints "INFO: No tasks are running" (no name). The
+    # filter text itself is never echoed, so the name appearing means running.
+    return image_name.lower() in out.lower()
+
+
+def taskkill(image_name, timeout=30):
+    """Kill a running process by image name, then wait until it has exited.
+
+    Returns only after the process is confirmed gone (or after `timeout`
+    seconds, so an unkillable process can't block the update forever).
+    """
     subprocess.call(
         ['taskkill', '/F', '/IM', image_name],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         creationflags=subprocess.CREATE_NO_WINDOW,
     )
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if not _process_running(image_name):
+            return
+        time.sleep(0.5)
 
 
 def extract_archive(winrar_exec, archive_path, dest_dir):
