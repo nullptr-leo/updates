@@ -11,6 +11,9 @@ def update_app():
     # find out the utilities executable path
     adrive_dir = updater.find_install_dir('aDrive')
 
+    # homepage
+    homepage = 'https://www.alipan.com/'
+
     # query the remote version
     print('Querying...')
     try:

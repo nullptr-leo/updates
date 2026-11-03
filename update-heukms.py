@@ -14,6 +14,9 @@ def update_app():
     heu_dir = updater.find_install_dir('HEU KMS Activator')
     winrar_exec = updater.find_winrar()
 
+    # homepage
+    homepage = 'https://github.com/zbezj/HEU_KMS_Activator/releases/latest'
+
     # query the remote version
     print('Querying...')
     try:

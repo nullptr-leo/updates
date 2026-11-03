@@ -10,6 +10,9 @@ def update_app():
     # find out the utilities executable path
     qq_dir = updater.find_install_dir(r'Tencent\QQNT')
 
+    # homepage
+    homepage = 'https://im.qq.com/index/#/log?platform=windows'
+
     # query the remote version
     print('Querying...')
     try:

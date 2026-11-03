@@ -7,6 +7,9 @@ def update_app():
     # proxy
     proxy = updater.test_proxy('default')
 
+    # homepage
+    homepage = 'https://github.com/microsoft/terminal/releases/latest'
+
     # query the remote version
     print('Querying...')
     try:

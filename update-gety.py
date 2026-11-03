@@ -11,6 +11,9 @@ def update_app():
     # find out the utilities executable path
     gety_dir = updater.find_install_dir('Gety')
 
+    # homepage
+    homepage = 'https://gety.ai/zh/changelog/'
+
     # query the remote version
     print('Querying...')
     try:

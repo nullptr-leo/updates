@@ -13,6 +13,9 @@ def update_app():
     oosu_dir = updater.find_install_dir('OOSU')
     winrar_exec = updater.find_winrar()
 
+    # homepage
+    homepage = 'https://www.oo-software.com/en/download/current/ooshutup10'
+
     # query the remote version
     print('Querying...')
     try:

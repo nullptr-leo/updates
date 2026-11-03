@@ -15,6 +15,9 @@ def update_app():
     ffmpeg_dir = updater.find_install_dir('ffmpeg')
     winrar_exec = updater.find_winrar()
 
+    # homepage
+    homepage = 'https://github.com/BtbN/FFmpeg-Builds/releases/latest'
+
     # query the remote version
     print('Querying...')
     try:

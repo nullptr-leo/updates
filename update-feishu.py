@@ -12,6 +12,9 @@ def update_app():
     # find out the utilities executable path
     feishu_dir = updater.find_install_dir('Feishu')
 
+    # homepage
+    homepage = 'https://www.feishu.cn/hc/zh-CN/articles/360043073734-飞书功能变化路径'
+
     # query the remote version
     print('Querying...')
     try:

@@ -11,6 +11,9 @@ def update_app():
     # find out the utilities executable path
     meeting_dir = updater.find_install_dir(r'Tencent\WeMeet')
 
+    # homepage
+    homepage = 'https://meeting.tencent.com/download.html'
+
     # query the remote version
     print('Querying...')
     try:

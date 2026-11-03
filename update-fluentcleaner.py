@@ -14,6 +14,9 @@ def update_app():
     fluentcleaner_dir = updater.find_install_dir('Fluent Cleaner')
     winrar_exec = updater.find_winrar()
 
+    # homepage
+    homepage = 'https://github.com/builtbybel/FluentCleaner/releases/latest'
+
     # query the remote version
     print('Querying...')
     try:

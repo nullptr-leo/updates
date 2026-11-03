@@ -11,6 +11,9 @@ def update_app():
     # find out the utilities executable path
     ticktick_dir = updater.find_install_dir('TickTick')
 
+    # homepage
+    homepage = 'https://www.ticktick.com/download'
+
     # query the remote version
     print('Querying...')
     try:

@@ -14,6 +14,9 @@ def update_app():
     zyperwin_dir = updater.find_install_dir('ZyperWin')
     winrar_exec = updater.find_winrar()
 
+    # homepage
+    homepage = 'https://github.com/ZyperWave/ZyperWinOptimize/releases/latest'
+
     # query the remote version
     print('Querying...')
     try:

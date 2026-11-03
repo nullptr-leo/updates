@@ -11,6 +11,9 @@ def update_app():
     # find out the utilities executable path
     python_dir = updater.find_install_dir('Python')
 
+    # homepage
+    homepage = 'https://www.python.org/downloads/'
+
     # query the remote version
     print('Querying...')
     try:

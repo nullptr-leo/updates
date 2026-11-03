@@ -14,6 +14,9 @@ def update_app():
     # find out the utilities executable path
     bcompare_dir = updater.find_install_dir('Beyond Compare')
 
+    # homepage
+    homepage = 'https://www.ghxi.com/beyondcompare.html'
+
     # query the remote version
     print('Querying...')
     try:

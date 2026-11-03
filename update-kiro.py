@@ -12,6 +12,9 @@ def update_app():
     # find out the utilities executable path
     kiro_dir = updater.find_install_dir('Kiro')
 
+    # homepage
+    homepage = 'https://kiro.dev/changelog/ide'
+
     # query the remote version
     print('Querying...')
     try:

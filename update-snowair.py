@@ -13,6 +13,9 @@ def update_app():
     # find out the utilities executable path
     snowair_dir = updater.find_install_dir('SnowAir')
 
+    # homepage
+    homepage = 'https://github.com/CM-idea/SnowAir/releases/latest'
+
     # query the remote version
     print('Querying...')
     try:

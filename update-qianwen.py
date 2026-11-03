@@ -13,6 +13,9 @@ def update_app():
     qianwen_candidates = ['QianwenApp', 'Qianwen\\QianwenApp']
     qianwen_dir = updater.find_install_dir(qianwen_candidates)
 
+    # homepage
+    homepage = 'https://qianwen.com/'
+
     # query the remote version
     print('Querying...')
     try:

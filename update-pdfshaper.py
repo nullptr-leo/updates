@@ -13,6 +13,9 @@ def update_app():
     # find out the utilities executable path
     pdfshaper_dir = updater.find_install_dir('PDFShaper')
 
+    # homepage
+    homepage = 'https://www.ghxi.com/pdfshaper.html'
+
     # query the remote version
     print('Querying...')
     try:

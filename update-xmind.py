@@ -11,6 +11,9 @@ def update_app():
     # find out the utilities executable path
     xmind_dir = updater.find_install_dir('Xmind')
 
+    # homepage
+    homepage = 'https://xmind.cn/zen/'
+
     # query the remote version
     print('Querying...')
     try:

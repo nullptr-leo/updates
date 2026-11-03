@@ -11,6 +11,9 @@ def update_app():
     # find out the utilities executable path
     insta360_dir = updater.find_install_dir('Insta360 Studio')
 
+    # homepage
+    homepage = 'https://www.insta360.com/cn/download/insta360-x4'
+
     # query the remote version
     print('Querying...')
     try:

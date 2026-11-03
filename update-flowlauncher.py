@@ -14,6 +14,9 @@ def update_app():
     flowlauncher_dir = updater.find_install_dir('FlowLauncher')
     winrar_exec = updater.find_winrar()
 
+    # homepage
+    homepage = 'https://github.com/Flow-Launcher/Flow.Launcher/releases/latest'
+
     # query the remote version
     print('Querying...')
     try:

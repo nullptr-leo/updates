@@ -12,6 +12,9 @@ def update_app():
     # find out the utilities executable path
     workbuddy_dir = updater.find_install_dir(r'WorkBuddy')
 
+    # homepage
+    homepage = 'https://www.workbuddy.cn/'
+
     # query the remote version
     print('Querying...')
     try:

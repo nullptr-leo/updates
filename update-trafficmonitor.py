@@ -14,6 +14,9 @@ def update_app():
     trafficmonitor_dir = updater.find_install_dir('Traffic Monitor')
     winrar_exec = updater.find_winrar()
 
+    # homepage
+    homepage = 'https://github.com/zhongyang219/TrafficMonitor/releases/latest'
+
     # query the remote version
     print('Querying...')
     try:

@@ -15,6 +15,9 @@ def update_app():
     snipaste_dir = updater.find_install_dir('Snipaste')
     winrar_exec = updater.find_winrar()
 
+    # homepage
+    homepage = 'https://www.snipaste.com/download.html#changelog'
+
     # query the remote version
     print('Querying...')
     try:

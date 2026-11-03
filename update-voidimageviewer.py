@@ -13,6 +13,9 @@ def update_app():
     viv_dir = updater.find_install_dir('Void Image Viewer')
     winrar_exec = updater.find_winrar()
 
+    # homepage
+    homepage = 'https://www.voidtools.com/forum/viewtopic.php?t=5623'
+
     # query the remote version
     print('Querying...')
     headers = {

@@ -14,6 +14,9 @@ def update_app():
     adb_dir = updater.find_install_dir('Adb')
     winrar_exec = updater.find_winrar()
 
+    # homepage
+    homepage = 'https://developer.android.com/studio/releases/platform-tools?hl=zh-cn'
+
     # query the remote version
     print('Querying...')
     try:

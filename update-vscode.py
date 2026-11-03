@@ -13,6 +13,9 @@ def update_app():
     # find out the utilities executable path
     vscode_dir = updater.find_install_dir('Microsoft VS Code')
 
+    # homepage
+    homepage = 'https://code.visualstudio.com/'
+
     # query the remote version
     print('Querying...')
     try:
@@ -33,8 +36,14 @@ def update_app():
 
     # navigate to download the update
     print('Preparing...')
-    updater.taskkill('Code.exe')
-    updater.open_exe(vscode_path)
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        download_path = os.path.join(temp_dir, remote_version + '.exe')
+        updater.download(remote_url, download_path, proxy=proxy)
+
+        # extract and update files
+        updater.taskkill('Code.exe')
+        updater.run_installer(download_path)
 
     updater.finish()
 

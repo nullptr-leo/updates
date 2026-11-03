@@ -13,6 +13,9 @@ def update_app():
     autorun_dir = updater.find_install_dir('Autoruns')
     winrar_exec = updater.find_winrar()
 
+    # homepage
+    homepage = 'https://learn.microsoft.com/zh-cn/sysinternals/downloads/autoruns'
+
     # query the remote version
     print('Querying...')
     try:

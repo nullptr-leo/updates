@@ -14,6 +14,9 @@ def update_app():
     winrar_dir = updater.find_install_dir('WinRAR')
     winrar_exec = updater.find_winrar()
 
+    # homepage
+    homepage = 'https://www.ghxi.com/winrarlh.html'
+
     # query the remote version
     print('Querying...')
     try:

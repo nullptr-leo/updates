@@ -514,6 +514,7 @@ class App:
         self._ctx_menu = tk.Menu(self.tree, tearoff=0)
         self._ctx_menu.add_command(label='检查更新', command=self._ctx_check_update)
         self._ctx_menu.add_command(label='打开程序目录', command=self._ctx_open_dir)
+        self._ctx_menu.add_command(label='打开软件主页', command=self._ctx_open_homepage)
         self._ctx_menu.add_command(label='忽略', command=self._ctx_ignore)
 
         # row colors by tag
@@ -706,6 +707,38 @@ class App:
         self.scripts = [(b, p) for b, p in self.scripts if pretty_name(b) != name]
         self.total = len(self.scripts)
         self.summary.config(text='共 %d 个软件' % self.total if self.total else '无软件')
+
+    def _ctx_open_homepage(self):
+        name = getattr(self, '_ctx_name', None)
+        if not name:
+            return
+        path = None
+        for base, p in self.scripts:
+            if pretty_name(base) == name:
+                path = p
+                break
+        if not path:
+            return
+        # read the `homepage` constant straight from the script source so we
+        # don't have to import the module (which would run its top-level imports
+        # and could fail silently under pythonw)
+        homepage = None
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                text = f.read()
+            m = re.search(r"homepage\s*=\s*['\"]([^'\"]+)['\"]", text)
+            if m:
+                homepage = m.group(1)
+        except (OSError, ValueError):
+            homepage = None
+        if not homepage:
+            return
+        # open in the default browser (os.startfile is reliable under pythonw;
+        # webbrowser.open can fail silently there)
+        if hasattr(os, 'startfile'):
+            os.startfile(homepage)
+        else:
+            subprocess.Popen(['cmd', '/c', 'start', '', homepage])
 
     def _record_update_time(self):
         self.last_update_lbl.config(

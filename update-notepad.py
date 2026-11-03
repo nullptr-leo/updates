@@ -11,6 +11,9 @@ def update_app():
     # find out the utilities executable path
     notepad_dir = updater.find_install_dir('Notepad')
 
+    # homepage
+    homepage = 'https://notepad-plus-plus.org/downloads/'
+
     # query the remote version
     print('Querying...')
     try:

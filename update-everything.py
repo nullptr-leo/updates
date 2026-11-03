@@ -13,6 +13,9 @@ def update_app():
     everything_dir = updater.find_install_dir('Everything')
     winrar_exec = updater.find_winrar()
 
+    # homepage
+    homepage = 'https://www.voidtools.com/forum/viewtopic.php?f=12&t=9787#changes'
+
     # query the remote version
     print('Querying...')
     headers = {

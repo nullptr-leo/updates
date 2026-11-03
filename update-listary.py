@@ -11,6 +11,9 @@ def update_app():
     # find out the utilities executable path
     listary_dir = updater.find_install_dir('Listary')
 
+    # homepage
+    homepage = 'https://www.listary.net/v7'
+
     # query the remote version
     print('Querying...')
     try:

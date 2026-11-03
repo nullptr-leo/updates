@@ -11,6 +11,9 @@ def update_app():
     # find out the utilities executable path
     git_dir = updater.find_install_dir('Git')
 
+    # homepage
+    homepage = 'https://git-scm.com/download/windows'
+
     # query the remote version
     print('Querying...')
     try:

@@ -15,6 +15,9 @@ def update_app():
     vlc_dir = updater.find_install_dir('VLC')
     winrar_exec = updater.find_winrar()
 
+    # homepage
+    homepage = 'https://artifacts.videolan.org/vlc-3.0/nightly-win64/'
+
     # query the remote version
     print('Querying...')
     try:

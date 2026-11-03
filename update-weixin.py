@@ -41,6 +41,9 @@ def update_app():
     # remove old version directories
     remove_old_version_dirs(weixin_dir)
 
+    # homepage
+    homepage = 'https://www.52pojie.cn/forum.php?mod=forumdisplay&fid=16&typeid=231&filter=typeid&typeid=231'
+
     # query the remote version
     print('Querying...')
     try:
