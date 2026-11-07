@@ -49,6 +49,10 @@ def update_app():
     # remove the stale desktop shortcut named WorkBuddy
     updater.remove_desktop_shortcut('WorkBuddy')
 
+    # remove the WorkBuddy entry from the directory background context menu
+    updater.delete_registry_key(
+        r'HKEY_CLASSES_ROOT\Directory\background\shell\WorkBuddy')
+
     updater.finish()
 
 if __name__ == '__main__':

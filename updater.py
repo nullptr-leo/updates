@@ -341,6 +341,16 @@ def remove_desktop_shortcut(name):
         os.remove(shortcut)
 
 
+def delete_registry_key(key_path):
+    """Delete a registry key (with all its subkeys) using `reg delete /f`."""
+    return subprocess.call(
+        ['reg', 'delete', key_path, '/f'],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    ) == 0
+
+
 def is_latest(remote_ver, local_ver, lexicographic=False):
     """Return True if the local version is up to date.
     By default versions are compared semantically via packaging.version.parse.
