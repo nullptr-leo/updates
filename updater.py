@@ -132,6 +132,7 @@ def get_redirected_url(url, headers=None, proxy=None):
 
 def download(url, dest_path, proxy=None):
     """Download a file with a progress indicator."""
+    print('Package path: %s' % dest_path)
     with closing(requests.get(url, stream=True, proxies={'https': proxy, 'http': proxy} if proxy else None, timeout=(30, 120), verify=False)) as response:
         response.raise_for_status()
         chunk_size = 65536  # 64KB

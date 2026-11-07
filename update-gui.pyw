@@ -184,6 +184,7 @@ class ScriptTask:
         self.seen_download = False
         self.local_version = ''
         self.remote_version = ''
+        self.package_path = ''
         self.output_lines = []
 
     def run(self, msg_queue):
@@ -245,6 +246,10 @@ class ScriptTask:
         if not seg:
             return
         self.output_lines.append(seg)
+        m_package = re.search(r'Package path:\s*(.*)', seg)
+        if m_package:
+            self.package_path = m_package.group(1).strip()
+            return
         m_remote = re.search(r'Remote version:\s*(.*)', seg)
         m_local = re.search(r'Local version:\s*(.*)', seg)
         if m_remote:
@@ -532,6 +537,7 @@ class App:
         self._ctx_menu = tk.Menu(self.tree, tearoff=0)
         self._ctx_menu.add_command(label='检查更新', command=self._ctx_check_update)
         self._ctx_menu.add_command(label='打开程序目录', command=self._ctx_open_dir)
+        self._ctx_menu.add_command(label='打开安装包目录', command=self._ctx_open_package_dir)
         self._ctx_menu.add_command(label='打开软件主页', command=self._ctx_open_homepage)
         self._ctx_menu.add_command(label='忽略', command=self._ctx_ignore)
 
@@ -666,7 +672,17 @@ class App:
         if item not in self.tree.selection():
             self.tree.selection_set(item)
         self._ctx_item = item
-        self._ctx_name = self.tree.item(item, 'values')[0]
+        vals = self.tree.item(item, 'values')
+        self._ctx_name = vals[0]
+        # the package lives in a temp dir that only exists while the script is
+        # running, so enable this entry only while the row is installing
+        task = self.tasks.get(self._ctx_name)
+        installing = vals[3].startswith(S_INSTALLING)
+        package_dir = (os.path.dirname(task.package_path)
+                       if task and task.package_path else '')
+        can_open = installing and bool(package_dir) and os.path.isdir(package_dir)
+        self._ctx_menu.entryconfig(
+            '打开安装包目录', state='normal' if can_open else 'disabled')
         try:
             self._ctx_menu.tk_popup(event.x_root, event.y_root)
         finally:
@@ -709,6 +725,19 @@ class App:
             target = os.path.dirname(target)
         os.startfile(target) if hasattr(os, 'startfile') else \
             subprocess.Popen(['explorer', target])
+
+    def _ctx_open_package_dir(self):
+        name = getattr(self, '_ctx_name', None)
+        if not name:
+            return
+        task = self.tasks.get(name)
+        if task is None or not task.package_path:
+            return
+        package_dir = os.path.dirname(task.package_path)
+        if not os.path.isdir(package_dir):
+            return
+        os.startfile(package_dir) if hasattr(os, 'startfile') else \
+            subprocess.Popen(['explorer', package_dir])
 
     def _ctx_ignore(self):
         name = getattr(self, '_ctx_name', None)
