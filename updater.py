@@ -25,12 +25,22 @@ SEARCH_PATHS = [
     'C:\\Users\\Leo\\AppData\\Local\\Programs',
 ]
 
+def is_forced():
+    """Return True when the update script was launched with -f (force update).
+
+    A forced update skips the local-version check and also runs when the
+    program is not installed yet.
+    """
+    return '-f' in sys.argv[1:]
+
+
 def find_install_dir(folder_name):
     """Find an installed software directory by folder name.
 
     folder_name may be a single name or a list of candidate names; the first
     one that exists (in any of SEARCH_PATHS) is returned. Exits if none are
-    found.
+    found. With -f, a missing directory is created under the first search
+    root so an uninstalled program can still be updated.
     """
     if isinstance(folder_name, str):
         names = [folder_name]
@@ -41,6 +51,14 @@ def find_install_dir(folder_name):
             path = os.path.join(prog_path, name)
             if os.path.exists(path):
                 return path
+    if is_forced():
+        path = os.path.join(SEARCH_PATHS[0], names[0])
+        try:
+            os.makedirs(path, exist_ok=True)
+        except OSError:
+            pass
+        print('Force update: using %s' % path)
+        return path
     print('%s not found.' % ', '.join(names))
     sys.exit(1)
 
@@ -61,6 +79,8 @@ def fail_and_exit():
 
 def get_file_version_parts(exe_path):
     """Return (HIWORD(ms), LOWORD(ms), HIWORD(ls), LOWORD(ls)) for custom formatting."""
+    if is_forced():
+        return 0, 0, 0, 0
     info = win.GetFileVersionInfo(exe_path, os.sep)
     ms, ls = info['FileVersionMS'], info['FileVersionLS']
     return win.HIWORD(ms), win.LOWORD(ms), win.HIWORD(ls), win.LOWORD(ls)
@@ -77,6 +97,8 @@ def get_appx_version(package_name):
     package_name is the package name (e.g. 'Microsoft.WindowsTerminal').
     Returns the version string 'major.minor.build.revision'.
     """
+    if is_forced():
+        return '0'
     try:
         from winrt.windows.management.deployment import PackageManager
         pm = PackageManager()
@@ -267,7 +289,10 @@ def is_latest(remote_ver, local_ver, lexicographic=False):
     """Return True if the local version is up to date.
     By default versions are compared semantically via packaging.version.parse.
     Pass lexicographic=True to compare them as plain strings instead.
+    With -f, always report "not up to date" so the update runs unconditionally.
     """
+    if is_forced():
+        return False
     if lexicographic:
         return remote_ver <= local_ver
     return version.parse(remote_ver) <= version.parse(local_ver)

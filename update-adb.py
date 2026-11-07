@@ -27,10 +27,12 @@ def update_app():
     print('Remote version: %s' % remote_version)
 
     # query the local version
-    local_version = None
-    with open(os.path.join(adb_dir, 'source.properties'), 'r') as f:
-        content = f.read()
-        local_version = re.search(r'Pkg\.Revision=([\d\.]*)', content, flags=re.M).group(1)
+    if updater.is_forced():
+        local_version = '0'
+    else:
+        with open(os.path.join(adb_dir, 'source.properties'), 'r') as f:
+            content = f.read()
+            local_version = re.search(r'Pkg\.Revision=([\d\.]*)', content, flags=re.M).group(1)
     print('Local version: %s' % local_version)
 
     # check if update is needed

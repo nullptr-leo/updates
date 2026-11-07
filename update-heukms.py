@@ -27,8 +27,12 @@ def update_app():
     print('Remote version: %s' % remote_version)
 
     # query the local version
-    local_path = glob.glob(os.path.join(heu_dir, 'HEU_KMS_Activator*'))[0]
-    local_version = updater.get_file_version(local_path)
+    if updater.is_forced():
+        local_path = None
+        local_version = '0'
+    else:
+        local_path = glob.glob(os.path.join(heu_dir, 'HEU_KMS_Activator*'))[0]
+        local_version = updater.get_file_version(local_path)
     print('Local version: %s' % local_version)
 
     # check if update is needed
@@ -48,7 +52,8 @@ def update_app():
         os.remove(download_path)
         deflate_path = glob.glob(os.path.join(temp_dir, 'HEU_KMS_Activator*'))[0]
         shutil.copy(deflate_path, heu_dir)
-    os.remove(local_path)
+    if local_path:
+        os.remove(local_path)
 
     updater.finish()
 

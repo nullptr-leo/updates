@@ -174,9 +174,10 @@ def get_git_version():
 class ScriptTask:
     """Runs one update script as a subprocess and streams its output."""
 
-    def __init__(self, name, path):
+    def __init__(self, name, path, force=False):
         self.name = name
         self.path = path
+        self.force = force
         self.process = None
         self.finished_status = None
         self.fail_reason = ''
@@ -193,8 +194,11 @@ class ScriptTask:
             env['PYTHONUNBUFFERED'] = '1'
             env['UPDATE_NONINTERACTIVE'] = '1'
             creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+            cmd = [sys.executable, '-u', self.path]
+            if self.force:
+                cmd.append('-f')
             self.process = subprocess.Popen(
-                [sys.executable, '-u', self.path],
+                cmd,
                 cwd=SCRIPT_DIR,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -536,6 +540,7 @@ class App:
         self.tree.bind('<Button-3>', self._on_right_click)
         self._ctx_menu = tk.Menu(self.tree, tearoff=0)
         self._ctx_menu.add_command(label='检查更新', command=self._ctx_check_update)
+        self._ctx_menu.add_command(label='强制更新', command=self._ctx_force_update)
         self._ctx_menu.add_command(label='打开程序目录', command=self._ctx_open_dir)
         self._ctx_menu.add_command(label='打开安装包目录', command=self._ctx_open_package_dir)
         self._ctx_menu.add_command(label='打开软件主页', command=self._ctx_open_homepage)
@@ -636,7 +641,7 @@ class App:
 
         self._ensure_processing()
 
-    def update_one(self, name):
+    def update_one(self, name, force=False):
         """Run a single update script for the given program name."""
         if name in self.active_tasks:
             return
@@ -647,7 +652,7 @@ class App:
                 break
         if not path:
             return
-        task = ScriptTask(name, path)
+        task = ScriptTask(name, path, force=force)
         self.tasks[name] = task
         self.active_tasks.add(name)
         self._update_session_active = True
@@ -693,6 +698,12 @@ class App:
                  for i in self.tree.selection()]
         for name in names:
             self.update_one(name)
+
+    def _ctx_force_update(self):
+        names = [self.tree.item(i, 'values')[0]
+                 for i in self.tree.selection()]
+        for name in names:
+            self.update_one(name, force=True)
 
     def _ctx_open_dir(self):
         name = getattr(self, '_ctx_name', None)

@@ -36,7 +36,10 @@ def update_app():
 
     # navigate to download the update
     print('Preparing...')
-    updater.open_exe(otp_path)
+    if updater.is_forced() and not os.path.exists(otp_path):
+        updater.open_url(homepage)
+    else:
+        updater.open_exe(otp_path)
 
     updater.finish()
 

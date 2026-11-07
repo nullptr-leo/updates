@@ -15,6 +15,8 @@ def remove_old_version_dirs(install_dir):
     '3.9.10'. When more than one exists, keep only the highest and delete the
     rest, so stale versions don't pile up.
     """
+    if not os.path.isdir(install_dir):
+        return
     version_paths = []
     for name in os.listdir(install_dir):
         full = os.path.join(install_dir, name)

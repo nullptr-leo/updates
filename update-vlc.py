@@ -37,7 +37,10 @@ def update_app():
     # query the local version
     vlc_path = os.path.join(vlc_dir, 'vlc.exe')
     local_version = updater.get_file_version(vlc_path)
-    local_date = time.strftime('%Y%m%d', time.localtime(os.path.getmtime(vlc_path)))
+    if updater.is_forced():
+        local_date = '0'
+    else:
+        local_date = time.strftime('%Y%m%d', time.localtime(os.path.getmtime(vlc_path)))
     print('Local version: %s (%s)' % (local_version, local_date))
 
     # check if update is needed
@@ -56,7 +59,7 @@ def update_app():
         updater.extract_archive(winrar_exec, download_path, temp_dir)
         os.remove(download_path)
         deflate_path = glob.glob(os.path.join(temp_dir, 'vlc-*'))[0]
-        shutil.rmtree(vlc_dir)
+        shutil.rmtree(vlc_dir, ignore_errors=True)
         shutil.copytree(deflate_path, vlc_dir, dirs_exist_ok=True)
 
     updater.finish()
