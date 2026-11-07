@@ -41,7 +41,9 @@ def update_app():
 
         # extract and update files
         updater.taskkill('TickTick.exe')
-        updater.run_installer(download_path)
+        updater.run_installer(
+            download_path,
+            '/verysilent /mergetasks=!desktopicon,!startupicon')
 
     updater.finish()
 
