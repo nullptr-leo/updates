@@ -1,5 +1,6 @@
 """Common utilities for software update scripts."""
 import os
+import shlex
 import sys
 import time
 import traceback
@@ -217,9 +218,19 @@ def list_archive(archive_path):
     raise ValueError('不支持的压缩格式: %s' % archive_path)
 
 
-def run_installer(installer_path):
-    """Run an installer executable."""
-    subprocess.call([installer_path])
+def run_installer(installer_path, args=None):
+    """Run an installer executable, optionally with command-line arguments.
+
+    `args` accepts either a sequence of argument strings or a single string
+    which is split into arguments (quotes are respected).
+    """
+    command = [installer_path]
+    if args:
+        if isinstance(args, str):
+            command.extend(shlex.split(args))
+        else:
+            command.extend(args)
+    subprocess.call(command)
 
 
 def open_url(url):

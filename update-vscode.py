@@ -43,7 +43,9 @@ def update_app():
 
         # extract and update files
         updater.taskkill('Code.exe')
-        updater.run_installer(download_path)
+        updater.run_installer(
+            download_path,
+            '/silent /log /mergetasks=!runcode,!desktopicon,!quicklaunchicon')
 
     updater.finish()
 
