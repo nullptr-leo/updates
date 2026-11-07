@@ -5,6 +5,7 @@ import sys
 import time
 import traceback
 import subprocess
+import tempfile
 import zipfile
 from contextlib import closing
 
@@ -127,14 +128,69 @@ def test_proxy(proxy):
         return None
 
 
-def query(url, headers=None, proxy=None):
-    """Query a URL and return the response text."""
+def query(url, headers=None, proxy=None, raise_on_error=False):
+    """Query a URL and return the response text.
+
+    By default a network error prints diagnostics and exits. Pass
+    raise_on_error=True to re-raise instead, so callers can retry another way.
+    """
     try:
         response = requests.get(url, headers=headers, proxies={'https': proxy} if proxy else None, timeout=30, verify=False)
         response.raise_for_status()
         return response.text
     except Exception:
+        if raise_on_error:
+            raise
         fail_and_exit()
+
+
+def query_rendered(url, proxy=None, timeout=40):
+    """Fetch a URL through headless Edge so JavaScript challenges are solved.
+
+    Returns the rendered DOM as text. Raises on failure instead of exiting, so
+    the caller can decide how to report it.
+    """
+    candidates = [
+        os.path.join(os.environ.get('ProgramFiles(x86)', r'C:\Program Files (x86)'),
+                     'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+        os.path.join(os.environ.get('ProgramFiles', r'C:\Program Files'),
+                     'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+        os.path.join(os.environ.get('LOCALAPPDATA', ''),
+                     'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+    ]
+    edge = next((p for p in candidates if p and os.path.isfile(p)), None)
+    if not edge:
+        raise RuntimeError('Microsoft Edge not found')
+
+    with tempfile.TemporaryDirectory(prefix='update-edge-') as profile:
+        cmd = [
+            edge,
+            '--headless=new',
+            '--disable-gpu',
+            '--no-first-run',
+            '--no-default-browser-check',
+            '--disable-extensions',
+            '--disable-background-networking',
+            '--user-data-dir=' + profile,
+            '--virtual-time-budget=12000',
+            '--dump-dom',
+        ]
+        if proxy:
+            cmd.append('--proxy-server=' + proxy)
+        cmd.append(url)
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=timeout,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+    if result.returncode != 0:
+        raise RuntimeError('headless Edge exited with code %d' % result.returncode)
+    text = result.stdout.decode('utf-8', errors='replace')
+    if not text.strip():
+        raise RuntimeError('headless Edge returned an empty page')
+    return text
 
 
 def get_redirected_url(url, headers=None, proxy=None):

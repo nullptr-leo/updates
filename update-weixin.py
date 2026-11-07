@@ -46,19 +46,33 @@ def update_app():
     # homepage
     homepage = 'https://www.52pojie.cn/forum.php?mod=forumdisplay&fid=16&typeid=231&filter=typeid&typeid=231'
 
-    # query the remote version
+    # query the remote version: plain request first, then headless browser
+    # (the forum serves a JavaScript challenge to plain HTTP clients)
     print('Querying...')
+    pattern = r'(forum\.php[^"]*)[^>]*>微信Windows版 v+([\d\.]*)'
+    fetchers = (
+        lambda url: updater.query(url, proxy=proxy, raise_on_error=True),
+        lambda url: updater.query_rendered(url, proxy=proxy),
+    )
     try:
         remote_info = None
-        for pageid in range(1, 3):
-            response = updater.query(f'https://www.52pojie.cn/forum.php?mod=forumdisplay&fid=16&typeid=231&filter=typeid&typeid=231&page={pageid}', proxy=proxy)
-            remote_info = re.search(r'(forum\.php[^"]*)[^>]*>微信Windows版 v+([\d\.]*)', response, flags=re.M)
+        for index, fetch in enumerate(fetchers):
+            try:
+                for pageid in range(1, 3):
+                    page_url = f'https://www.52pojie.cn/forum.php?mod=forumdisplay&fid=16&typeid=231&filter=typeid&typeid=231&page={pageid}'
+                    remote_info = re.search(pattern, fetch(page_url), flags=re.M)
+                    if remote_info:
+                        break
+            except Exception:
+                remote_info = None
             if remote_info:
-                remote_version = remote_info.group(2)
-                remote_url = remote_info.group(1)
                 break
+            if index == 0:
+                print('Retrying with headless browser...')
         if not remote_info:
             raise Exception('Remote version not found')
+        remote_version = remote_info.group(2)
+        remote_url = remote_info.group(1)
     except Exception:
         updater.fail_and_exit()
     print('Remote version: %s' % remote_version)
