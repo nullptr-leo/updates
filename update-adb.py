@@ -43,7 +43,7 @@ def update_app():
 
     with tempfile.TemporaryDirectory() as temp_dir:
         download_path = os.path.join(temp_dir, remote_version + '.zip')
-        updater.download(remote_url, download_path, proxy=proxy)
+        updater.download(remote_url, download_path)
 
         # extract and update files
         updater.taskkill('adb.exe')
