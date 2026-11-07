@@ -119,6 +119,21 @@ def set_auto_update(enabled):
         json.dump(cfg, f, ensure_ascii=False, indent=2)
 
 
+def open_config():
+    """Create the config file if missing, then open it in the default editor."""
+    if not os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+                json.dump({'ignored_program': [], 'auto_update': False}, f,
+                          ensure_ascii=False, indent=2)
+        except OSError:
+            return
+    if hasattr(os, 'startfile'):
+        os.startfile(CONFIG_PATH)
+    else:
+        subprocess.Popen(['cmd', '/c', 'start', '', CONFIG_PATH])
+
+
 def find_scripts():
     """Return sorted [(filename, path)] of update-*.py in the script dir."""
     ignored = load_ignored()
@@ -387,6 +402,7 @@ class TrayIcon:
         menu = win32gui.CreatePopupMenu()
         win32gui.AppendMenu(menu, win32con.MF_STRING, 1, '显示窗口')
         win32gui.AppendMenu(menu, win32con.MF_STRING, 3, '更新软件')
+        win32gui.AppendMenu(menu, win32con.MF_STRING, 4, '打开配置')
         win32gui.AppendMenu(menu, win32con.MF_STRING, 2, '退出')
         pos = win32api.GetCursorPos()
         win32gui.SetForegroundWindow(self.hwnd)
@@ -398,6 +414,8 @@ class TrayIcon:
             self.on_restore()
         elif cmd == 3:
             self.on_update()
+        elif cmd == 4:
+            open_config()
         elif cmd == 2:
             self.on_exit()
 
