@@ -45,7 +45,7 @@ def update_app():
         updater.taskkill('Code.exe')
         updater.run_installer(
             download_path,
-            '/silent /log /mergetasks=!runcode,!desktopicon,!quicklaunchicon')
+            '/verysilent /mergetasks=!runcode,!desktopicon,!quicklaunchicon')
 
     updater.finish()
 
