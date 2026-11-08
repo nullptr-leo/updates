@@ -41,7 +41,10 @@ def update_app():
 
         # extract and update files
         updater.taskkill('Gety.exe')
-        updater.run_installer(download_path)
+        updater.run_installer(download_path, '/S')
+
+    # remove the stale desktop shortcut named Gety
+    updater.remove_desktop_shortcut('Gety')
 
     updater.finish()
 
