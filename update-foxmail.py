@@ -42,6 +42,9 @@ def update_app():
         updater.taskkill('Foxmail.exe')
         updater.run_installer(download_path)
 
+    # remove the stale desktop shortcut named Foxmail
+    updater.remove_desktop_shortcut('Foxmail')
+
     updater.finish()
 
 if __name__ == '__main__':
