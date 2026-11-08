@@ -10,7 +10,7 @@ def update_app():
     proxy = None
 
     # find out the utilities executable path
-    procexp_dir = updater.find_install_dir('Process Monitor')
+    procexp_dir = updater.find_install_dir('Process Explorer')
     winrar_exec = updater.find_winrar()
 
     # homepage
