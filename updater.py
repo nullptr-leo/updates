@@ -6,6 +6,7 @@ import time
 import traceback
 import subprocess
 import tempfile
+import winreg
 import zipfile
 from contextlib import closing
 
@@ -349,6 +350,108 @@ def delete_registry_key(key_path):
         stderr=subprocess.DEVNULL,
         creationflags=subprocess.CREATE_NO_WINDOW,
     ) == 0
+
+
+# Machine-wide (system) environment variables live in HKLM. Writing there
+# requires administrator rights; user-level variables are never touched.
+_ENV_ROOT = winreg.HKEY_LOCAL_MACHINE
+_ENV_SUBKEY = r'SYSTEM\CurrentControlSet\Control\Session Manager\Environment'
+
+
+def _read_env_var(key):
+    """Return (value, value_type) of a machine-wide variable.
+
+    value_type is None when the variable does not exist (or is not a string).
+    """
+    try:
+        with winreg.OpenKey(_ENV_ROOT, _ENV_SUBKEY, 0, winreg.KEY_READ) as reg:
+            try:
+                value, value_type = winreg.QueryValueEx(reg, key)
+            except FileNotFoundError:
+                return '', None
+    except FileNotFoundError:
+        return '', None
+    if not isinstance(value, str):
+        return '', None
+    return value, value_type
+
+
+def _write_env_var(key, value, value_type):
+    """Persist a machine-wide variable and notify other windows."""
+    if value_type not in (winreg.REG_SZ, winreg.REG_EXPAND_SZ):
+        value_type = winreg.REG_EXPAND_SZ if '%' in value else winreg.REG_SZ
+    with winreg.CreateKeyEx(_ENV_ROOT, _ENV_SUBKEY, 0, winreg.KEY_SET_VALUE) as reg:
+        winreg.SetValueEx(reg, key, 0, value_type, value)
+    _notify_env_change()
+
+
+def _notify_env_change():
+    """Broadcast WM_SETTINGCHANGE so newly started programs see the change."""
+    try:
+        import win32con
+        import win32gui
+        win32gui.SendMessageTimeout(
+            win32con.HWND_BROADCAST, win32con.WM_SETTINGCHANGE,
+            0, 'Environment', win32con.SMTO_ABORTIFHUNG, 3000)
+    except Exception:
+        pass
+
+
+def _env_has_entry(current, entry):
+    """Return True if `entry` is present in a ';'-separated value.
+
+    Comparison is case-insensitive and ignores trailing separators, so a
+    PATH entry can be checked without creating duplicates on Windows.
+    """
+    entry = entry.strip()
+    if not entry:
+        return True
+    target = os.path.normcase(os.path.normpath(entry))
+    for part in current.split(';'):
+        part = part.strip()
+        if part and os.path.normcase(os.path.normpath(part)) == target:
+            return True
+    return False
+
+
+def set_env_var(key, value):
+    """Create or overwrite a machine-wide environment variable.
+
+    Only the system environment (HKLM) is used; requires administrator
+    rights. The existing REG_SZ / REG_EXPAND_SZ type is preserved. Changes
+    apply to newly started processes. Returns True when changed.
+    """
+    current, value_type = _read_env_var(key)
+    if current == value and value_type is not None:
+        return False
+    _write_env_var(key, value, value_type)
+    return True
+
+
+def append_env_var(key, values):
+    """Append entries to a machine-wide ';'-separated variable (e.g. PATH).
+
+    `values` is a list of entries (a single string is also accepted). Entries
+    already present in the system value are skipped, the rest are appended,
+    and the resulting value always ends with a semicolon. User-level values
+    are ignored. Returns True when the variable was changed.
+    """
+    if isinstance(values, str):
+        values = [values]
+    current, value_type = _read_env_var(key)
+    pending = []
+    for value in values:
+        value = value.strip()
+        if (not value or _env_has_entry(current, value)
+                or _env_has_entry(';'.join(pending), value)):
+            continue
+        pending.append(value)
+    if not pending:
+        return False
+    base = current.rstrip(';')
+    new_value = (base + ';' if base else '') + ';'.join(pending) + ';'
+    _write_env_var(key, new_value, value_type)
+    return True
 
 
 def is_latest(remote_ver, local_ver, lexicographic=False):

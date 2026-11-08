@@ -49,6 +49,10 @@ def update_app():
         updater.extract_archive(winrar_exec, download_path, deflate_dir)
         shutil.copytree(deflate_dir, innounp_dir, dirs_exist_ok=True)
 
+    # make innounp.exe available from any command prompt
+    if updater.append_env_var('PATH', [innounp_dir]):
+        print('Added %s to PATH' % innounp_dir)
+
     updater.finish()
 
 if __name__ == '__main__':
