@@ -20,6 +20,7 @@ def update_app():
     print('Querying...')
     try:
         response = updater.get_redirected_url('https://code.visualstudio.com/sha/download?build=stable&os=win32-x64', proxy=proxy)
+        remote_url = response
         remote_version = re.search(r'x64-([\d\.]*)\.', response, flags=re.M).group(1)
     except Exception:
         updater.fail_and_exit()
