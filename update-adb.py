@@ -54,6 +54,10 @@ def update_app():
         deflate_path = glob.glob(os.path.join(temp_dir, 'platform-tools'))[0]
         shutil.copytree(deflate_path, adb_dir, dirs_exist_ok=True)
 
+    # make adb.exe available from any command prompt
+    if updater.append_env_var('PATH', [adb_dir]):
+        print('Added %s to PATH' % adb_dir)
+
     updater.finish()
 
 if __name__ == '__main__':
