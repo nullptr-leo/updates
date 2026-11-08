@@ -41,7 +41,7 @@ def update_app():
 
         # extract and update files
         updater.taskkill('notepad++.exe')
-        updater.run_installer(download_path)
+        updater.run_installer(download_path, '/S /closeRunningNpp')
 
     updater.finish()
 
