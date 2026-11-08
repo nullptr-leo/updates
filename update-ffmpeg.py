@@ -57,6 +57,11 @@ def update_app():
         deflate_path = glob.glob(os.path.join(temp_dir, 'ffmpeg-*'))[0]
         shutil.copytree(deflate_path, ffmpeg_dir, dirs_exist_ok=True)
 
+    # make ffmpeg.exe available from any command prompt
+    bin_dir = os.path.join(ffmpeg_dir, 'bin')
+    if updater.append_env_var('PATH', [bin_dir]):
+        print('Added %s to PATH' % bin_dir)
+
     updater.finish()
 
 if __name__ == '__main__':
