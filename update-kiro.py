@@ -42,7 +42,11 @@ def update_app():
 
         # extract and update files
         updater.taskkill('Kiro.exe')
-        updater.run_installer(download_path)
+        updater.run_installer(
+            download_path,
+            '/verysilent /mergetasks=!runcode,!desktopicon,!quicklaunchicon,'
+            '!addcontextmenufiles,!addcontextmenufolders,!associatewithfiles,'
+            '!addtopath')
 
     updater.finish()
 
