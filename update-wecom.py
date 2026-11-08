@@ -9,7 +9,7 @@ def update_app():
     proxy = updater.test_proxy('default')
 
     # find out the utilities executable path
-    wecom_dir = updater.find_install_dir('WXWork')
+    wecom_dir = updater.find_install_dir(['WXWork', r'Tencent\WXWork'])
 
     # homepage
     homepgage = 'https://work.weixin.qq.com/#indexDownload'
