@@ -96,7 +96,7 @@ def update_app():
 def match_archive(entries):
     for name in entries:
         n = name.replace('\\', '/')
-        if n == 'Weixin' or n.startswith('Weixin/'):
+        if n in ('Weixin', 'Weixin.exe') or n.startswith('Weixin/'):
             return True
     return False
 
@@ -109,7 +109,8 @@ def install_archive(archive_path, entries):
         # extraction failure -> stop here, leave the existing install untouched
         updater.taskkill('Weixin.exe')
         updater.extract_archive(winrar_exec, archive_path, temp_dir)
-        deflate_path = glob.glob(os.path.join(temp_dir, 'Weixin'))[0]
+        weixin_paths = glob.glob(os.path.join(temp_dir, 'Weixin'))
+        deflate_path = weixin_paths[0] if weixin_paths else temp_dir
         shutil.copytree(deflate_path, weixin_dir, dirs_exist_ok=True)
 
         # remove old version directories
