@@ -26,7 +26,6 @@ def update_app():
     print('Remote version: %s' % remote_version)
 
     # query the local version
-
     snowair_path = os.path.join(snowair_dir, 'SnowAir-Lite.exe')
     local_version = updater.get_file_version(snowair_path)
     print('Local version: %s' % local_version)
