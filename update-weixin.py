@@ -46,6 +46,10 @@ def update_app():
     # homepage
     homepage = 'https://www.52pojie.cn/forum.php?mod=forumdisplay&fid=16&typeid=231&filter=typeid&typeid=231'
 
+    # query the local version
+    local_version = updater.get_file_version(os.path.join(weixin_dir, 'Weixin.exe'))
+    print('Local version: %s' % local_version)
+
     # query the remote version: plain request first, then headless browser
     # (the forum serves a JavaScript challenge to plain HTTP clients)
     print('Querying...')
@@ -76,10 +80,6 @@ def update_app():
     except Exception:
         updater.fail_and_exit()
     print('Remote version: %s' % remote_version)
-
-    # query the local version
-    local_version = updater.get_file_version(os.path.join(weixin_dir, 'Weixin.exe'))
-    print('Local version: %s' % local_version)
 
     # check if update is needed
     if updater.is_latest(remote_version, local_version):

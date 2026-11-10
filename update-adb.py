@@ -17,15 +17,6 @@ def update_app():
     # homepage
     homepage = 'https://developer.android.com/studio/releases/platform-tools?hl=zh-cn'
 
-    # query the remote version
-    print('Querying...')
-    try:
-        response = updater.query('https://developer.android.com/tools/releases/platform-tools?hl=zh-cn', proxy=proxy)
-        remote_version = re.search(r'h4 data\-text="([\d\.]*)', response, flags=re.M).group(1)
-    except Exception:
-        updater.fail_and_exit()
-    print('Remote version: %s' % remote_version)
-
     # query the local version
     if updater.is_forced():
         local_version = '0'
@@ -34,6 +25,15 @@ def update_app():
             content = f.read()
             local_version = re.search(r'Pkg\.Revision=([\d\.]*)', content, flags=re.M).group(1)
     print('Local version: %s' % local_version)
+
+    # query the remote version
+    print('Querying...')
+    try:
+        response = updater.query('https://developer.android.com/tools/releases/platform-tools?hl=zh-cn', proxy=proxy)
+        remote_version = re.search(r'h4 data\-text="([\d\.]*)', response, flags=re.M).group(1)
+    except Exception:
+        updater.fail_and_exit()
+    print('Remote version: %s' % remote_version)
 
     # check if update is needed
     if updater.is_latest(remote_version, local_version):

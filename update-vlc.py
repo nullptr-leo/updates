@@ -18,6 +18,15 @@ def update_app():
     # homepage
     homepage = 'https://artifacts.videolan.org/vlc-3.0/nightly-win64/'
 
+    # query the local version
+    vlc_path = os.path.join(vlc_dir, 'vlc.exe')
+    local_version = updater.get_file_version(vlc_path)
+    if updater.is_forced():
+        local_date = '0'
+    else:
+        local_date = time.strftime('%Y%m%d', time.localtime(os.path.getmtime(vlc_path)))
+    print('Local version: %s (%s)' % (local_version, local_date))
+
     # query the remote version
     print('Querying...')
     try:
@@ -33,15 +42,6 @@ def update_app():
     except Exception:
         updater.fail_and_exit()
     print('Remote version: %s (%s)' % (remote_version, remote_date))
-
-    # query the local version
-    vlc_path = os.path.join(vlc_dir, 'vlc.exe')
-    local_version = updater.get_file_version(vlc_path)
-    if updater.is_forced():
-        local_date = '0'
-    else:
-        local_date = time.strftime('%Y%m%d', time.localtime(os.path.getmtime(vlc_path)))
-    print('Local version: %s (%s)' % (local_version, local_date))
 
     # check if update is needed
     if updater.is_latest(remote_version, local_version) and remote_date <= local_date:

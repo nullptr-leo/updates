@@ -16,6 +16,11 @@ def update_app():
     # homepage
     homepage = 'https://code.visualstudio.com/'
 
+    # query the local version
+    vscode_path = os.path.join(vscode_dir, 'Code.exe')
+    local_version = updater.get_file_version(vscode_path)
+    print('Local version: %s' % local_version)
+
     # query the remote version
     print('Querying...')
     try:
@@ -25,11 +30,6 @@ def update_app():
     except Exception:
         updater.fail_and_exit()
     print('Remote version: %s' % remote_version)
-
-    # query the local version
-    vscode_path = os.path.join(vscode_dir, 'Code.exe')
-    local_version = updater.get_file_version(vscode_path)
-    print('Local version: %s' % local_version)
 
     # check if update is needed
     if updater.is_latest(remote_version, local_version):

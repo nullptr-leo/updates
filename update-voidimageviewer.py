@@ -16,6 +16,10 @@ def update_app():
     # homepage
     homepage = 'https://www.voidtools.com/forum/viewtopic.php?t=5623'
 
+    # query the local version
+    local_version = updater.get_file_version(os.path.join(viv_dir, 'voidImageViewer.exe'))
+    print('Local version: %s' % local_version)
+
     # query the remote version
     print('Querying...')
     headers = {
@@ -29,10 +33,6 @@ def update_app():
     except Exception:
         updater.fail_and_exit()
     print('Remote version: %s' % remote_version)
-
-    # query the local version
-    local_version = updater.get_file_version(os.path.join(viv_dir, 'voidImageViewer.exe'))
-    print('Local version: %s' % local_version)
 
     # check if update is needed
     if updater.is_latest(remote_version, local_version):

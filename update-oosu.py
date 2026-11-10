@@ -16,6 +16,11 @@ def update_app():
     # homepage
     homepage = 'https://www.oo-software.com/en/download/current/ooshutup10'
 
+    # query the local version
+    oosu_path = os.path.join(oosu_dir, 'OOSU10.exe')
+    local_version = updater.get_file_version(oosu_path)
+    print('Local version: %s' % local_version)
+
     # query the remote version
     print('Querying...')
     try:
@@ -24,11 +29,6 @@ def update_app():
     except Exception:
         updater.fail_and_exit()
     print('Remote version: %s' % remote_version)
-
-    # query the local version
-    oosu_path = os.path.join(oosu_dir, 'OOSU10.exe')
-    local_version = updater.get_file_version(oosu_path)
-    print('Local version: %s' % local_version)
 
     # check if update is needed
     if updater.is_latest(remote_version, local_version):

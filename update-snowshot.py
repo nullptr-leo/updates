@@ -17,6 +17,11 @@ def update_app():
     # homepage
     homepage = 'https://github.com/mg-chao/snow-apps/releases/latest'
 
+    # query the local version
+    snowshot_path = os.path.join(snowshot_dir, 'bin', 'snow_shot.exe')
+    local_version = updater.get_file_version(snowshot_path)
+    print('Local version: %s' % local_version)
+
     # query the remote version
     # the repo releases several apps, so only vX.Y.Z_snow-shot tags count here
     print('Querying...')
@@ -26,11 +31,6 @@ def update_app():
     except Exception:
         updater.fail_and_exit()
     print('Remote version: %s' % remote_version)
-
-    # query the local version
-    snowshot_path = os.path.join(snowshot_dir, 'bin', 'snow_shot.exe')
-    local_version = updater.get_file_version(snowshot_path)
-    print('Local version: %s' % local_version)
 
     # check if update is needed
     if updater.is_latest(remote_version, local_version):

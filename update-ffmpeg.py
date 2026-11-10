@@ -18,16 +18,6 @@ def update_app():
     # homepage
     homepage = 'https://github.com/BtbN/FFmpeg-Builds/releases/latest'
 
-    # query the remote version
-    print('Querying...')
-    try:
-        response = updater.query('https://github.com/BtbN/FFmpeg-Builds/releases/latest', proxy=proxy)
-        remote_info = re.search(r'Auto-Build (\(*)(\d*)-(\d*)-(\d*)', response, flags=re.M)
-        remote_version = remote_info.group(2) + remote_info.group(3) + remote_info.group(4)
-    except Exception:
-        updater.fail_and_exit()
-    print('Remote version: %s' % remote_version)
-
     # query the local version
     if updater.is_forced():
         local_version = '0'
@@ -37,6 +27,16 @@ def update_app():
         local_info = result.stdout.decode('utf8').splitlines()[0]
         local_version = re.search(r'version N-[^-]*-[^-]*-([^ ]*)', local_info, flags=re.M).group(1)
     print('Local version: %s' % local_version)
+
+    # query the remote version
+    print('Querying...')
+    try:
+        response = updater.query('https://github.com/BtbN/FFmpeg-Builds/releases/latest', proxy=proxy)
+        remote_info = re.search(r'Auto-Build (\(*)(\d*)-(\d*)-(\d*)', response, flags=re.M)
+        remote_version = remote_info.group(2) + remote_info.group(3) + remote_info.group(4)
+    except Exception:
+        updater.fail_and_exit()
+    print('Remote version: %s' % remote_version)
 
     # check if update is needed
     if updater.is_latest(remote_version, local_version):

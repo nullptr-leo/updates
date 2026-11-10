@@ -17,15 +17,6 @@ def update_app():
     # homepage
     homepage = 'https://github.com/zbezj/HEU_KMS_Activator/releases/latest'
 
-    # query the remote version
-    print('Querying...')
-    try:
-        response = updater.query('https://github.com/zbezj/HEU_KMS_Activator/releases/latest', proxy=proxy)
-        remote_version = re.search(r'tag/([\d\.]+)', response, flags=re.M).group(1)
-    except Exception:
-        updater.fail_and_exit()
-    print('Remote version: %s' % remote_version)
-
     # query the local version
     if updater.is_forced():
         local_path = None
@@ -34,6 +25,15 @@ def update_app():
         local_path = glob.glob(os.path.join(heu_dir, 'HEU_KMS_Activator*'))[0]
         local_version = updater.get_file_version(local_path)
     print('Local version: %s' % local_version)
+
+    # query the remote version
+    print('Querying...')
+    try:
+        response = updater.query('https://github.com/zbezj/HEU_KMS_Activator/releases/latest', proxy=proxy)
+        remote_version = re.search(r'tag/([\d\.]+)', response, flags=re.M).group(1)
+    except Exception:
+        updater.fail_and_exit()
+    print('Remote version: %s' % remote_version)
 
     # check if update is needed
     if updater.is_latest(remote_version, local_version):

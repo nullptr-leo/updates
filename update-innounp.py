@@ -16,6 +16,10 @@ def update_app():
     # homepage
     homepage = 'https://github.com/jrathlev/InnoUnpacker-Windows-GUI/releases/latest'
 
+    # query the local version
+    local_version = updater.get_file_version(os.path.join(innounp_dir, 'innounp.exe'))
+    print('Local version: %s' % local_version)
+
     # query the remote version
     print('Querying...')
     url = ('https://raw.githubusercontent.com/jrathlev/InnoUnpacker-Windows-GUI/refs/heads/master/innounp-2/docs/innounp-cl.txt')
@@ -25,10 +29,6 @@ def update_app():
     except Exception:
         updater.fail_and_exit()
     print('Remote version: %s' % remote_version)
-
-    # query the local version
-    local_version = updater.get_file_version(os.path.join(innounp_dir, 'innounp.exe'))
-    print('Local version: %s' % local_version)
 
     # check if update is needed
     if updater.is_latest(remote_version, local_version):

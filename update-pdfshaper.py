@@ -16,6 +16,10 @@ def update_app():
     # homepage
     homepage = 'https://www.ghxi.com/pdfshaper.html'
 
+    # query the local version
+    local_version = updater.get_file_version(os.path.join(pdfshaper_dir, 'PDFShaper.exe'))
+    print('Local version: %s' % local_version)
+
     # query the remote version
     print('Querying...')
     try:
@@ -24,10 +28,6 @@ def update_app():
     except Exception:
         updater.fail_and_exit()
     print('Remote version: %s' % remote_version)
-
-    # query the local version
-    local_version = updater.get_file_version(os.path.join(pdfshaper_dir, 'PDFShaper.exe'))
-    print('Local version: %s' % local_version)
 
     # check if update is needed
     if updater.is_latest(remote_version, local_version):

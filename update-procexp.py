@@ -16,6 +16,11 @@ def update_app():
     # homepage
     homepage = 'https://learn.microsoft.com/en-us/sysinternals/downloads/process-explorer'
 
+    # query the local version
+    procexp_path = os.path.join(procexp_dir, 'procexp64.exe')
+    local_version = updater.get_file_version(procexp_path)
+    print('Local version: %s' % local_version)
+
     # query the remote version
     print('Querying...')
     try:
@@ -27,11 +32,6 @@ def update_app():
     except Exception:
         updater.fail_and_exit()
     print('Remote version: %s' % remote_version)
-
-    # query the local version
-    procexp_path = os.path.join(procexp_dir, 'procexp64.exe')
-    local_version = updater.get_file_version(procexp_path)
-    print('Local version: %s' % local_version)
 
     # check if update is needed
     if updater.is_latest(remote_version, local_version):
