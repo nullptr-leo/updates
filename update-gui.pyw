@@ -49,9 +49,10 @@ S_INSTALLING = '安装中'
 S_UPTODATE = '已是最新'
 S_SKIPPED = '未安装'
 S_DONE = '完成'
+S_DOWNLOADED = '已下载'
 S_FAILED = '失败'
 
-_TERMINAL = {S_UPTODATE, S_SKIPPED, S_DONE, S_FAILED}
+_TERMINAL = {S_UPTODATE, S_SKIPPED, S_DONE, S_DOWNLOADED, S_FAILED}
 _PCT_RE = re.compile(r'\(([\d.]+)%\)')
 # Matches 'Download: 3.45MB / 6.78MB (50.91%)' -> cur, total, pct
 _DL_RE = re.compile(r'Download:\s*([\d.]+)MB(?:\s*/\s*([\d.]+)MB)?\s*\(([\d.]+)%\)')
@@ -266,6 +267,19 @@ def find_local_exe(script_path):
     return candidates[0] if len(candidates) == 1 else None
 
 
+def can_download_package(script_path):
+    """Whether the script fetches its installer through updater.download().
+
+    A few scripts only open a download page in the browser (no direct URL),
+    so there is no installer that could be saved to the Desktop.
+    """
+    try:
+        with open(script_path, 'r', encoding='utf-8') as f:
+            return 'updater.download(' in f.read()
+    except (OSError, ValueError):
+        return False
+
+
 def get_git_version():
     """Return (commit_count, commit_date) from git, or ('', '') on failure."""
     try:
@@ -286,10 +300,11 @@ def get_git_version():
 class ScriptTask:
     """Runs one update script as a subprocess and streams its output."""
 
-    def __init__(self, name, path, force=False):
+    def __init__(self, name, path, force=False, download_only=False):
         self.name = name
         self.path = path
         self.force = force
+        self.download_only = download_only
         self.process = None
         self.finished_status = None
         self.fail_reason = ''
@@ -307,8 +322,12 @@ class ScriptTask:
             env['UPDATE_NONINTERACTIVE'] = '1'
             creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
             cmd = [sys.executable, '-u', self.path]
-            if self.force:
+            # -f skips the local version check; -d saves the installer to
+            # the Desktop and stops before installing anything.
+            if self.force or self.download_only:
                 cmd.append('-f')
+            if self.download_only:
+                cmd.append('-d')
             self.process = subprocess.Popen(
                 cmd,
                 cwd=SCRIPT_DIR,
@@ -366,6 +385,12 @@ class ScriptTask:
         if m_package:
             self.package_path = m_package.group(1).strip()
             return
+        m_downloaded = re.search(r'^Downloaded:\s*(.*)', seg)
+        if m_downloaded:
+            self.finished_status = S_DOWNLOADED
+            self._emit(msg_queue, S_DOWNLOADED,
+                       os.path.basename(m_downloaded.group(1).strip()))
+            return
         m_remote = re.search(r'Remote version:\s*(.*)', seg)
         m_local = re.search(r'Local version:\s*(.*)', seg)
         if m_remote:
@@ -400,7 +425,7 @@ class ScriptTask:
                     else:
                         progress = '%.1f%% (%.1fM)' % (pct, cur_mb)
                     self._emit(msg_queue, S_DOWNLOADING, progress)
-                if pct >= 99.9:
+                if pct >= 99.9 and not self.download_only:
                     self._emit(msg_queue, S_INSTALLING, '')
             else:
                 # no content-length: show downloaded size as progress
@@ -653,6 +678,7 @@ class App:
         self._ctx_menu = tk.Menu(self.tree, tearoff=0)
         self._ctx_menu.add_command(label='检查更新', command=self._ctx_check_update)
         self._ctx_menu.add_command(label='强制更新', command=self._ctx_force_update)
+        self._ctx_menu.add_command(label='下载安装包', command=self._ctx_download_only)
         self._ctx_menu.add_command(label='打开程序', command=self._ctx_open_program)
         self._ctx_menu.add_command(label='打开程序目录', command=self._ctx_open_dir)
         self._ctx_menu.add_command(label='打开安装包目录', command=self._ctx_open_package_dir)
@@ -696,7 +722,7 @@ class App:
         self.summary.config(text='共 %d 个软件' % self.total if self.total else '无软件')
 
     def _tag_for(self, status):
-        if status == S_DONE:
+        if status in (S_DONE, S_DOWNLOADED):
             return 'done'
         if status == S_UPTODATE:
             return 'uptodate'
@@ -754,7 +780,7 @@ class App:
 
         self._ensure_processing()
 
-    def update_one(self, name, force=False):
+    def update_one(self, name, force=False, download_only=False):
         """Run a single update script for the given program name."""
         if name in self.active_tasks:
             return
@@ -765,10 +791,12 @@ class App:
                 break
         if not path:
             return
-        task = ScriptTask(name, path, force=force)
+        task = ScriptTask(name, path, force=force,
+                          download_only=download_only)
         self.tasks[name] = task
         self.active_tasks.add(name)
-        self._update_session_active = True
+        if not download_only:
+            self._update_session_active = True
         self._set_row(name, S_QUERYING, '', 'running', local_version='', remote_version='')
         self.update_all_btn.config(state='disabled')
         threading.Thread(target=task.run, args=(self.msg_queue,), daemon=True).start()
@@ -798,6 +826,10 @@ class App:
         self._ctx_program = find_local_exe(script_path) if script_path else None
         self._ctx_menu.entryconfig(
             '打开程序', state='normal' if self._ctx_program else 'disabled')
+        # scripts that only open a download page cannot save an installer
+        can_download = bool(script_path) and can_download_package(script_path)
+        self._ctx_menu.entryconfig(
+            '下载安装包', state='normal' if can_download else 'disabled')
         # the package lives in a temp dir that only exists while the script is
         # running, so enable this entry only while the row is installing
         task = self.tasks.get(self._ctx_name)
@@ -823,6 +855,15 @@ class App:
                  for i in self.tree.selection()]
         for name in names:
             self.update_one(name, force=True)
+
+    def _ctx_download_only(self):
+        """Download the selected programs' installers to the Desktop."""
+        names = [self.tree.item(i, 'values')[0]
+                 for i in self.tree.selection()]
+        for name in names:
+            path = self._script_path(name)
+            if path and can_download_package(path):
+                self.update_one(name, download_only=True)
 
     def _script_path(self, name):
         """Return the update script path for a displayed program name."""

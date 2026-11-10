@@ -36,6 +36,20 @@ def is_forced():
     return '-f' in sys.argv[1:]
 
 
+def is_download_only():
+    """Return True when launched with -d (save the installer, do not install).
+
+    The GUI also passes -f in this mode so every local version check is
+    skipped; download() then ends the script before any install step runs.
+    """
+    return '-d' in sys.argv[1:] or '--download-only' in sys.argv[1:]
+
+
+def desktop_dir():
+    """Return the current user's Desktop directory."""
+    return os.path.join(os.path.expanduser('~'), 'Desktop')
+
+
 def find_install_dir(folder_name):
     """Find an installed software directory by folder name.
 
@@ -53,6 +67,11 @@ def find_install_dir(folder_name):
             path = os.path.join(prog_path, name)
             if os.path.exists(path):
                 return path
+    if is_download_only():
+        # No local version is read in this mode (download() exits first), so
+        # a missing install directory must not stop the download or create
+        # an empty folder.
+        return os.path.join(SEARCH_PATHS[0], names[0])
     if is_forced():
         path = os.path.join(SEARCH_PATHS[0], names[0])
         try:
@@ -210,7 +229,21 @@ def get_redirected_url(url, headers=None, proxy=None):
 
 
 def download(url, dest_path, proxy=None):
-    """Download a file with a progress indicator."""
+    """Download a file with a progress indicator.
+
+    With -d, save the installer to the Desktop under a program-prefixed name
+    and stop the script right after the download, so nothing gets installed.
+    """
+    if is_download_only():
+        program = os.path.splitext(os.path.basename(sys.argv[0]))[0]
+        if program.startswith('update-'):
+            program = program[len('update-'):]
+        name = '%s-%s' % (program, os.path.basename(dest_path))
+        for ch in '<>:"/\\|?*':
+            name = name.replace(ch, '_')
+        desktop = desktop_dir()
+        os.makedirs(desktop, exist_ok=True)
+        dest_path = os.path.join(desktop, name)
     print('Package path: %s' % dest_path)
     with closing(requests.get(url, stream=True, proxies={'https': proxy, 'http': proxy} if proxy else None, timeout=(30, 120), verify=False)) as response:
         response.raise_for_status()
@@ -228,6 +261,9 @@ def download(url, dest_path, proxy=None):
                         content_size / 1024 / 1024, progress), end='\r')
                 else:
                     print('Download: %.2fMB' % (data_count / 1024 / 1024), end='\r')
+    if is_download_only():
+        print('Downloaded: %s' % dest_path)
+        sys.exit(0)
 
 
 def _process_running(image_name):
@@ -252,6 +288,8 @@ def taskkill(image_name, timeout=30):
     Returns only after the process is confirmed gone (or after `timeout`
     seconds, so an unkillable process can't block the update forever).
     """
+    if is_download_only():
+        return
     subprocess.call(
         ['taskkill', '/F', '/IM', image_name],
         stdout=subprocess.DEVNULL,
@@ -336,8 +374,8 @@ def remove_desktop_shortcut(name):
     """
     if not name.lower().endswith('.lnk'):
         name += '.lnk'
-    desktop_dir = os.path.join(os.path.expanduser('~'), 'Desktop')
-    shortcut = os.path.join(desktop_dir, name)
+    desktop = desktop_dir()
+    shortcut = os.path.join(desktop, name)
     if os.path.exists(shortcut):
         os.remove(shortcut)
 
