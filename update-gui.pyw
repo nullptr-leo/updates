@@ -5,6 +5,7 @@ percentage) / installing / done / failed, etc. The "Update All" button
 launches every update-*.py concurrently and parses their stdout in real
 time to update the list.
 """
+import ast
 import glob
 import importlib
 import json
@@ -152,6 +153,117 @@ def pretty_name(filename):
     if name.startswith('update-'):
         name = name[len('update-'):]
     return name
+
+
+def parse_script_program(script_path):
+    """Return (install folders, exe path parts, glob patterns) for a script.
+
+    Update scripts locate the installed program with
+    `X_dir = updater.find_install_dir(...)` and build its main executable
+    with `os.path.join(X_dir, ..., 'app.exe')`. Both are parsed statically so
+    importing a script (with its own top-level imports) is never necessary.
+    """
+    try:
+        with open(script_path, 'r', encoding='utf-8') as f:
+            tree = ast.parse(f.read(), filename=script_path)
+    except (OSError, ValueError, SyntaxError):
+        return [], [], []
+
+    # find_install_dir() also accepts a list held in a variable, e.g.
+    # qianwen_candidates = ['QianwenApp', 'Qianwen\\QianwenApp']
+    list_vars = {}
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Assign)
+                and isinstance(node.value, (ast.List, ast.Tuple))):
+            continue
+        values = [e.value for e in node.value.elts
+                  if isinstance(e, ast.Constant) and isinstance(e.value, str)]
+        if values:
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    list_vars[target.id] = values
+
+    def folder_names(arg):
+        if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+            return [arg.value]
+        if isinstance(arg, (ast.List, ast.Tuple)):
+            return [name for item in arg.elts for name in folder_names(item)]
+        if isinstance(arg, ast.Name):
+            return list(list_vars.get(arg.id, []))
+        return []
+
+    folders, dir_vars = [], set()
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Assign)
+                and isinstance(node.value, ast.Call)):
+            continue
+        call = node.value
+        if not (isinstance(call.func, ast.Attribute)
+                and call.func.attr == 'find_install_dir' and call.args):
+            continue
+        folders.extend(folder_names(call.args[0]))
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                dir_vars.add(target.id)
+
+    parts, patterns = [], []
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == 'join' and len(node.args) >= 2):
+            continue
+        first, rest = node.args[0], node.args[1:]
+        if not (isinstance(first, ast.Name) and first.id in dir_vars):
+            continue
+        if not all(isinstance(a, ast.Constant) and isinstance(a.value, str)
+                   for a in rest):
+            continue
+        values = [a.value for a in rest]
+        if values[-1].lower().endswith('.exe'):
+            if not parts:
+                parts = values
+        elif '*' in values[-1]:
+            patterns.append(values)
+    return folders, parts, patterns
+
+
+def find_local_exe(script_path):
+    """Return the absolute path of a script's locally installed main exe."""
+    folders, parts, patterns = parse_script_program(script_path)
+    if not folders:
+        return None
+    install_dir = None
+    for folder in folders:
+        for root in updater.SEARCH_PATHS:
+            candidate = os.path.join(root, folder)
+            if os.path.isdir(candidate):
+                install_dir = candidate
+                break
+            if os.path.isfile(candidate):
+                install_dir = os.path.dirname(candidate)
+                break
+        if install_dir:
+            break
+    if not install_dir:
+        return None
+    if parts:
+        target = os.path.join(install_dir, *parts)
+        return target if os.path.isfile(target) else None
+    for values in patterns:
+        for match in glob.glob(os.path.join(install_dir, *values)):
+            if os.path.isfile(match) and match.lower().endswith('.exe'):
+                return match
+    # Command-line tools (adb, ffmpeg, ...) never name an executable in the
+    # script; fall back to a shallow scan of the install directory.
+    key = pretty_name(os.path.basename(script_path)).lower()
+    candidates = []
+    for pattern in ('*.exe', '*/*.exe'):
+        candidates.extend(glob.glob(os.path.join(install_dir, pattern)))
+    matches = [p for p in candidates
+               if os.path.basename(p).lower().startswith(key)]
+    if matches:
+        return min(matches, key=len)
+    return candidates[0] if len(candidates) == 1 else None
 
 
 def get_git_version():
@@ -541,6 +653,7 @@ class App:
         self._ctx_menu = tk.Menu(self.tree, tearoff=0)
         self._ctx_menu.add_command(label='检查更新', command=self._ctx_check_update)
         self._ctx_menu.add_command(label='强制更新', command=self._ctx_force_update)
+        self._ctx_menu.add_command(label='打开程序', command=self._ctx_open_program)
         self._ctx_menu.add_command(label='打开程序目录', command=self._ctx_open_dir)
         self._ctx_menu.add_command(label='打开安装包目录', command=self._ctx_open_package_dir)
         self._ctx_menu.add_command(label='打开软件主页', command=self._ctx_open_homepage)
@@ -679,6 +792,12 @@ class App:
         self._ctx_item = item
         vals = self.tree.item(item, 'values')
         self._ctx_name = vals[0]
+        # resolve the local main executable so "打开程序" is only enabled
+        # when the program can actually be launched
+        script_path = self._script_path(self._ctx_name)
+        self._ctx_program = find_local_exe(script_path) if script_path else None
+        self._ctx_menu.entryconfig(
+            '打开程序', state='normal' if self._ctx_program else 'disabled')
         # the package lives in a temp dir that only exists while the script is
         # running, so enable this entry only while the row is installing
         task = self.tasks.get(self._ctx_name)
@@ -704,6 +823,26 @@ class App:
                  for i in self.tree.selection()]
         for name in names:
             self.update_one(name, force=True)
+
+    def _script_path(self, name):
+        """Return the update script path for a displayed program name."""
+        for base, path in self.scripts:
+            if pretty_name(base) == name:
+                return path
+        return None
+
+    def _ctx_open_program(self):
+        """Launch the locally installed program for the right-clicked row."""
+        path = getattr(self, '_ctx_program', None)
+        if not path or not os.path.isfile(path):
+            return
+        try:
+            if hasattr(os, 'startfile'):
+                os.startfile(path)
+            else:
+                subprocess.Popen([path])
+        except OSError:
+            pass
 
     def _ctx_open_dir(self):
         name = getattr(self, '_ctx_name', None)
