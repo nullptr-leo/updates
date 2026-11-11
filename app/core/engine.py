@@ -170,14 +170,15 @@ class UpdateEngine:
         last_error: Exception | None = None
         for pattern in remote.pattern.split("||"):
             try:
-                match = re.search(pattern, text, flags=re.M | re.I)
-                if not match:
-                    continue
-                groups = match.groups()
-                if remote.transform == "groups_join":
-                    return "".join(g or "" for g in groups[1:])
-                raw = groups[0] if groups else match.group(0)
-                return _transform(raw, remote.transform)
+                for match in re.finditer(pattern, text, flags=re.M | re.I):
+                    groups = match.groups()
+                    if remote.transform == "groups_join":
+                        value = "".join(g or "" for g in groups[1:])
+                    else:
+                        raw = (groups[0] or "") if groups else match.group(0)
+                        value = _transform(raw, remote.transform)
+                    if value and value.strip():
+                        return value
             except Exception as exc:
                 last_error = exc
         raise QueryFailed(f"版本解析失败: {remote.url}") from last_error

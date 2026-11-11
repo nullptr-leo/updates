@@ -349,5 +349,40 @@ class DetailPanelLayoutTests(unittest.TestCase):
             self.assertTrue(label.isHidden())
 
 
+class RemoteParsingTests(unittest.TestCase):
+    def test_listary_uses_full_version_not_major_banner(self):
+        spec = spec_by_id("listary")
+        page = (
+            "<title>Listary V7 Beta 现已上线</title>"
+            "<h2>Listary V7 Beta</h2>"
+            "<p>v7.1.0.45 Beta</p>"
+            "<p>v7.1.0.47 Beta</p>"
+            "<p>v7.0.0.9 Beta</p>"
+        )
+        engine = UpdateEngine(Settings(), lambda ev: None)
+        with patch.object(services, "http_get", return_value=page):
+            info = engine._remote_info(spec, None)
+        self.assertEqual(info.version, "7.1.0.47")
+
+    def test_trafficmonitor_reads_version_from_release_tag(self):
+        spec = spec_by_id("trafficmonitor")
+        final = ("https://github.com/zhongyang219/TrafficMonitor/"
+                 "releases/tag/V1.86")
+        engine = UpdateEngine(Settings(), lambda ev: None)
+        with patch.object(services, "get_redirected_url", return_value=final):
+            info = engine._remote_info(spec, None)
+        self.assertEqual(info.version, "1.86")
+        self.assertTrue(
+            spec.download.url.format(version=info.version).endswith(
+                "TrafficMonitor_V1.86_x64.zip"))
+
+    def test_empty_regex_captures_are_skipped(self):
+        remote = RemoteSpec(url="https://example.com", kind="regex",
+                            pattern=r"V([\d\.]*)")
+        value = UpdateEngine._extract_version(
+            remote, "<div>view version</div> Release V1.86 available")
+        self.assertEqual(value, "1.86")
+
+
 if __name__ == "__main__":
     unittest.main()
