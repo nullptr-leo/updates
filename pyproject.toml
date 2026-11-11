@@ -18,7 +18,7 @@ dependencies = [
 # Optional: winsdk (AppX versions), unrar (legacy .rar archives) are loaded
 # lazily and only needed for the matching recipes.
 
-[project.scripts]
+[project.gui-scripts]
 update-scripts = "app.bootstrap:run"
 
 [tool.setuptools.packages.find]

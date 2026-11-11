@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+MAIN_SCRIPT = PROJECT_ROOT / "main.pyw"
 ASSETS_DIR = PROJECT_ROOT / "assets"
 LEGACY_DIR = PROJECT_ROOT / "legacy"
 CONFIG_PATH = PROJECT_ROOT / "update-config.json"
@@ -17,6 +19,15 @@ _data_root = Path(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")) / "
 DATA_DIR = _data_root
 LOG_PATH = DATA_DIR / "logs" / "app.log"
 CACHE_PATH = DATA_DIR / "cache.json"
+
+
+def pythonw_executable() -> str:
+    """Return pythonw.exe when available, so restarts stay console-free."""
+    exe = sys.executable
+    if os.name != "nt":
+        return exe
+    candidate = os.path.join(os.path.dirname(exe), "pythonw.exe")
+    return candidate if os.path.isfile(candidate) else exe
 
 
 def default_search_paths() -> list[str]:

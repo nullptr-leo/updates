@@ -1,6 +1,8 @@
-"""Application bootstrap: single instance, DPI, theme, logging and CLI mode.
+"""Application bootstrap: single instance, theme, logging and CLI mode.
 
-Qt is imported lazily so ``--cli`` runs on the pure-Python core only.
+``main.pyw`` is launched by pythonw.exe (no console window). Use ``--hidden``
+to start in the system tray without showing the main window. Qt is imported
+lazily so ``--cli`` runs on the pure-Python core only.
 """
 from __future__ import annotations
 
@@ -43,7 +45,7 @@ def _already_running() -> bool:
 
 
 def run_cli(argv: list[str]) -> int:
-    """Headless check/update without Qt: python main.py --cli check [ids...]."""
+    """Headless check/update without Qt: python main.pyw --cli check [ids...]."""
     from .apps.hooks import HOOKS
     from .core.cancellation import CancellationToken
     from .core.engine import UpdateEngine
@@ -52,7 +54,7 @@ def run_cli(argv: list[str]) -> int:
 
     settings = load_settings()
     if len(argv) < 2:
-        print("用法: python main.py --cli check|update|force [app-id ...]")
+        print("用法: python main.pyw --cli check|update|force [app-id ...]")
         return 2
     try:
         mode = Mode(argv[1].lower())
@@ -84,6 +86,8 @@ def run_cli(argv: list[str]) -> int:
 def run(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     setup_logging()
+    hidden = "--hidden" in argv
+    argv = [a for a in argv if a != "--hidden"]
     if argv and argv[0] == "--cli":
         return run_cli(argv)
 
@@ -123,5 +127,8 @@ def run(argv: list[str] | None = None) -> int:
         window.restore_from_tray(),
         server.nextPendingConnection().close(),
     ))
-    window.show()
+    if hidden and window.tray.icon.isVisible():
+        window.hide()
+    else:
+        window.show()
     return app.exec()

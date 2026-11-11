@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 import threading
 from pathlib import Path
 
@@ -20,7 +19,8 @@ from ..adapters.qt_process import QProcessPort
 from ..apps.hooks import HOOKS
 from ..core import cache, services
 from ..core.config import (
-    CONFIG_PATH, ICON_PATH, PROJECT_ROOT, Settings, load_settings, save_settings,
+    CONFIG_PATH, ICON_PATH, MAIN_SCRIPT, PROJECT_ROOT, Settings, load_settings,
+    pythonw_executable, save_settings,
 )
 from ..core.models import ACTIVE_PHASES, AppSpec, Mode, ProgressEvent
 from ..core.registry import spec_by_id, visible_specs
@@ -558,7 +558,7 @@ class MainWindow(QMainWindow):
             self, "自更新完成", "代码已更新，是否重启应用？",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if answer == QMessageBox.StandardButton.Yes:
-            QProcess.startDetached(sys.executable, [str(PROJECT_ROOT / "main.py")])
+            QProcess.startDetached(pythonw_executable(), [str(MAIN_SCRIPT)])
             self.quit_app()
 
     def dragEnterEvent(self, event) -> None:
