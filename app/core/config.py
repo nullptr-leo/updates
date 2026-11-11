@@ -16,7 +16,6 @@ _SETTINGS_LOCK = threading.RLock()
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MAIN_SCRIPT = PROJECT_ROOT / "main.pyw"
 ASSETS_DIR = PROJECT_ROOT / "assets"
-LEGACY_DIR = PROJECT_ROOT / "legacy"
 CONFIG_PATH = PROJECT_ROOT / "update-config.json"
 ICON_PATH = ASSETS_DIR / "update.ico"
 UNRAR_DLL = ASSETS_DIR / "UnRAR64.dll"
