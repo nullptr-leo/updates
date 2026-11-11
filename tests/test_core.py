@@ -167,5 +167,58 @@ class ThreadingTests(unittest.TestCase):
         self.assertEqual(received[-1].remote_version, "9.9.9")
 
 
+class CacheConcurrencyTests(unittest.TestCase):
+    def test_concurrent_writes_are_safe_and_complete(self):
+        import tempfile
+        import threading
+        from pathlib import Path
+        from app.core import cache
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "cache.json"
+            with patch.object(cache, "CACHE_PATH", target):
+                errors = []
+
+                def worker(i):
+                    try:
+                        for j in range(15):
+                            cache.update_app_cache(f"app{i}", remote=f"1.0.{j}")
+                            cache.record_update_time()
+                    except Exception as exc:
+                        errors.append(exc)
+
+                threads = [threading.Thread(target=worker, args=(i,))
+                           for i in range(8)]
+                for thread in threads:
+                    thread.start()
+                for thread in threads:
+                    thread.join()
+
+                self.assertEqual(errors, [])
+                data = cache.load_cache()
+                self.assertEqual(len(data["apps"]), 8)
+                self.assertTrue(data["last_update"])
+                leftovers = [p.name for p in Path(tmpdir).iterdir()
+                             if p.name.endswith(".tmp")]
+                self.assertEqual(leftovers, [])
+
+    def test_cache_write_failure_does_not_fail_check(self):
+        from app.core import cache
+        spec = AppSpec(
+            id="demo", name="Demo", homepage="",
+            remote=RemoteSpec(url="https://example.com", kind="regex",
+                              pattern=r"v([\d.]+)"),
+            install=InstallSpec(kind="installer"),
+        )
+        events = []
+        engine = UpdateEngine(Settings(), events.append, hooks=HOOKS)
+        with patch.object(services, "http_get", return_value="v1.2.3"), \
+             patch.object(cache, "atomic_write_json",
+                          side_effect=PermissionError("denied")):
+            engine.run(spec, Mode.CHECK, CancellationToken())
+        self.assertEqual(events[-1].phase, Phase.DONE)
+        self.assertTrue(events[-1].finished)
+
+
 if __name__ == "__main__":
     unittest.main()

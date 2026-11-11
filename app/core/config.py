@@ -2,10 +2,16 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
+import threading
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+
+from .atomic_io import atomic_write_json
+
+_SETTINGS_LOCK = threading.RLock()
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MAIN_SCRIPT = PROJECT_ROOT / "main.pyw"
@@ -88,19 +94,22 @@ def load_settings() -> Settings:
             raw = json.load(fh)
     except (OSError, ValueError, TypeError):
         return Settings()
+    if not isinstance(raw, dict):
+        return Settings()
     settings = Settings.from_dict(raw)
     if raw.get("schema") != 2:
         # One-time, lossless upgrade from the v1 keys ignored_program/auto_update.
-        save_settings(settings)
+        try:
+            save_settings(settings)
+        except Exception as exc:
+            logging.getLogger("updatescripts").warning(
+                "配置迁移写入失败（继续使用内存配置）: %s", exc)
     return settings
 
 
 def save_settings(settings: Settings) -> None:
-    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp = CONFIG_PATH.with_suffix(".json.tmp")
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(settings.to_dict(), fh, ensure_ascii=False, indent=2)
-    os.replace(tmp, CONFIG_PATH)
+    with _SETTINGS_LOCK:
+        atomic_write_json(CONFIG_PATH, settings.to_dict())
 
 
 def download_dir() -> Path:
