@@ -19,8 +19,8 @@ from ..adapters.qt_process import QProcessPort
 from ..apps.hooks import HOOKS
 from ..core import cache, services
 from ..core.config import (
-    CONFIG_PATH, ICON_PATH, MAIN_SCRIPT, PROJECT_ROOT, Settings, load_settings,
-    pythonw_executable, save_settings,
+    CONFIG_PATH, ICON_PATH, IS_FROZEN, PROJECT_ROOT, Settings, load_settings,
+    restart_command, save_settings,
 )
 from ..core.models import ACTIVE_PHASES, AppSpec, Mode, ProgressEvent
 from ..core.registry import spec_by_id, visible_specs
@@ -533,6 +533,12 @@ class MainWindow(QMainWindow):
 
     # -------------------------------------------------------- upgrade / DnD
     def _self_update(self) -> None:
+        if IS_FROZEN:
+            self.activity.append_line("当前为独立安装包，请获取新版本安装程序")
+            QMessageBox.information(
+                self, "升级软件",
+                "当前为独立安装包，暂不支持在线升级，请获取新版本的安装程序。")
+            return
         self.activity.append_line("正在检查并获取最新版本…")
 
         def work() -> None:
@@ -567,7 +573,7 @@ class MainWindow(QMainWindow):
             self, "升级完成", "已升级到最新版本，是否现在重启应用？",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if answer == QMessageBox.StandardButton.Yes:
-            QProcess.startDetached(pythonw_executable(), [str(MAIN_SCRIPT)])
+            QProcess.startDetached(*restart_command())
             self.quit_app()
 
     def dragEnterEvent(self, event) -> None:

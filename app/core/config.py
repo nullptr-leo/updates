@@ -13,10 +13,14 @@ from .atomic_io import atomic_write_json
 
 _SETTINGS_LOCK = threading.RLock()
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-MAIN_SCRIPT = PROJECT_ROOT / "main.pyw"
-ASSETS_DIR = PROJECT_ROOT / "assets"
-CONFIG_PATH = PROJECT_ROOT / "update-config.json"
+IS_FROZEN = getattr(sys, "frozen", False)
+# PyInstaller unpacks data files into sys._MEIPASS (a fresh temp dir for
+# one-file builds), so runtime resources must be resolved from there.
+BASE_DIR = (Path(getattr(sys, "_MEIPASS", os.path.dirname(sys.executable)))
+            if IS_FROZEN else Path(__file__).resolve().parents[2])
+PROJECT_ROOT = BASE_DIR
+MAIN_SCRIPT = BASE_DIR / "main.pyw"
+ASSETS_DIR = BASE_DIR / "assets"
 ICON_PATH = ASSETS_DIR / "update.ico"
 UNRAR_DLL = ASSETS_DIR / "UnRAR64.dll"
 
@@ -24,6 +28,10 @@ _data_root = Path(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")) / "
 DATA_DIR = _data_root
 LOG_PATH = DATA_DIR / "logs" / "app.log"
 CACHE_PATH = DATA_DIR / "cache.json"
+# A frozen one-file exe is extracted anew on every launch, so settings belong
+# in the user profile rather than beside the (temporary) code.
+CONFIG_PATH = (DATA_DIR / "update-config.json" if IS_FROZEN
+               else BASE_DIR / "update-config.json")
 
 
 def pythonw_executable() -> str:
@@ -33,6 +41,21 @@ def pythonw_executable() -> str:
         return exe
     candidate = os.path.join(os.path.dirname(exe), "pythonw.exe")
     return candidate if os.path.isfile(candidate) else exe
+
+
+def restart_command() -> tuple[str, list[str]]:
+    """Program and arguments used to relaunch the app after an upgrade."""
+    if IS_FROZEN:
+        return sys.executable, []
+    return pythonw_executable(), [str(MAIN_SCRIPT)]
+
+
+def config_path_for_read() -> Path:
+    """Also accept a config sitting beside the exe, easing migration to builds."""
+    if CONFIG_PATH.is_file() or not IS_FROZEN:
+        return CONFIG_PATH
+    beside_exe = Path(sys.executable).resolve().parent / "update-config.json"
+    return beside_exe if beside_exe.is_file() else CONFIG_PATH
 
 
 def default_search_paths() -> list[str]:
@@ -89,7 +112,7 @@ class Settings:
 
 def load_settings() -> Settings:
     try:
-        with open(CONFIG_PATH, "r", encoding="utf-8") as fh:
+        with open(config_path_for_read(), "r", encoding="utf-8") as fh:
             raw = json.load(fh)
     except (OSError, ValueError, TypeError):
         return Settings()

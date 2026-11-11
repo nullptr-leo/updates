@@ -16,6 +16,8 @@ INSTANCE_KEY = "UpdateScripts.SingleInstance.v2"
 
 
 def git_version() -> str:
+    if getattr(sys, "frozen", False):
+        return ""
     try:
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         count = subprocess.check_output(
@@ -89,7 +91,10 @@ def _install_chinese_translator(app) -> None:
     from PySide6.QtCore import QLibraryInfo, QTranslator
 
     translator = QTranslator(app)
-    folders = [
+    folders = []
+    if getattr(sys, "frozen", False):
+        folders.append(Path(getattr(sys, "_MEIPASS", "")) / "translations")
+    folders += [
         Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)),
         Path(PySide6.__file__).resolve().parent / "translations",
     ]
