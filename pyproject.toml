@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "update-scripts"
+version = "2.0.0"
+description = "PySide6 desktop updater for Windows applications"
+requires-python = ">=3.10"
+dependencies = [
+    "PySide6>=6.6",
+    "requests[socks]>=2.31",
+    "packaging>=23.0",
+    "pywin32>=306; sys_platform == 'win32'",
+    "py7zr>=0.20; sys_platform == 'win32'",
+]
+
+# Optional: winsdk (AppX versions), unrar (legacy .rar archives) are loaded
+# lazily and only needed for the matching recipes.
+
+[project.scripts]
+update-scripts = "app.bootstrap:run"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
