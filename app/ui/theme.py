@@ -4,6 +4,7 @@ LIGHT_QSS = """
 QWidget { font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif; font-size: 13px; color: #1f2328; }
 QMainWindow, QDialog { background: #f6f7f9; }
 QFrame#Card { background: #ffffff; border: 1px solid #e3e6ea; border-radius: 10px; }
+QScrollArea#DetailScroll, QWidget#DetailViewport, QWidget#DetailContent { background: transparent; border: none; }
 QLabel#Title { font-size: 19px; font-weight: 600; color: #111418; }
 QLabel#Subtle { color: #6b7280; }
 QLabel#Stat { color: #374151; padding: 2px 8px; }
@@ -39,6 +40,7 @@ DARK_QSS = """
 QWidget { font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif; font-size: 13px; color: #e6e8eb; }
 QMainWindow, QDialog { background: #161a20; }
 QFrame#Card { background: #1d222a; border: 1px solid #2c333d; border-radius: 10px; }
+QScrollArea#DetailScroll, QWidget#DetailViewport, QWidget#DetailContent { background: transparent; border: none; }
 QLabel#Title { font-size: 19px; font-weight: 600; color: #f3f5f7; }
 QLabel#Subtle { color: #8b95a3; }
 QLabel#Stat { color: #c6ccd4; padding: 2px 8px; }

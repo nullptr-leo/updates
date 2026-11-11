@@ -5,13 +5,15 @@ from __future__ import annotations
 import time
 from collections import deque
 from dataclasses import replace
+from urllib.parse import urlsplit
 
-from PySide6.QtCore import QRect, Qt, Signal
+from PySide6.QtCore import QEvent, QRect, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen, QTextCursor
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
     QFrame, QHBoxLayout, QLabel, QLineEdit, QMenu, QPlainTextEdit, QProgressBar,
-    QPushButton, QSpinBox, QStyledItemDelegate, QVBoxLayout, QGridLayout,
+    QPushButton, QScrollArea, QSizePolicy, QSpinBox, QStyledItemDelegate,
+    QVBoxLayout, QGridLayout, QWidget,
 )
 
 from ..core.config import Settings
@@ -66,6 +68,59 @@ class ProgressDelegate(QStyledItemDelegate):
         painter.restore()
 
 
+class _DetailScrollArea(QScrollArea):
+    """Pin detail content to the viewport width and keep its natural height.
+
+    A regular ``widgetResizable`` scroll area still squeezes word-wrapped
+    labels when the panel is short, and an unbreakable URL can make the
+    content wider than the visible area. Here the panel scrolls vertically
+    instead of deforming its children.
+    """
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setObjectName("DetailScroll")
+        self.setWidgetResizable(False)
+        self.setFrameShape(QFrame.Shape.NoFrame)
+        self.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.viewport().setObjectName("DetailViewport")
+        self.viewport().setAutoFillBackground(False)
+        self.viewport().installEventFilter(self)
+
+    def eventFilter(self, obj, event) -> bool:
+        if obj is self.viewport() and event.type() == QEvent.Type.Resize:
+            self.fit_content()
+        return super().eventFilter(obj, event)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self.fit_content()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self.fit_content()
+
+    def fit_content(self) -> None:
+        content = self.widget()
+        if content is None or not self.isVisible():
+            return
+        width = self.viewport().width()
+        if width <= 0:
+            return
+        if content.width() != width:
+            content.resize(width, content.height())
+        layout = content.layout()
+        needed = layout.totalHeightForWidth(width) if layout else -1
+        if needed < 0:
+            needed = content.sizeHint().height()
+        height = max(self.viewport().height(), needed)
+        if content.height() != height:
+            content.resize(width, height)
+
+
 class DetailPanel(QFrame):
     actionRequested = Signal(str, str)
 
@@ -81,15 +136,27 @@ class DetailPanel(QFrame):
         self.setObjectName("Card")
         self.setMinimumWidth(250)
         self._spec: AppSpec | None = None
-        root = QVBoxLayout(self)
+
+        self.scroll = _DetailScrollArea(self)
+
+        self.content = QWidget()
+        self.content.setObjectName("DetailContent")
+        self.content.setAutoFillBackground(False)
+        root = QVBoxLayout(self.content)
         root.setContentsMargins(16, 16, 16, 16)
         root.setSpacing(8)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(self.scroll)
+        self.scroll.setWidget(self.content)
 
         self.title = QLabel("选择一个软件")
         self.title.setObjectName("Title")
         self.title.setWordWrap(True)
         self.subtitle = QLabel("")
         self.subtitle.setObjectName("Subtle")
+        self.subtitle.setWordWrap(True)
         self.homepage = QLabel("")
         self.homepage.setOpenExternalLinks(True)
         self.homepage.setTextInteractionFlags(
@@ -100,7 +167,11 @@ class DetailPanel(QFrame):
         self.note = QLabel("")
         self.note.setWordWrap(True)
         self.note.setObjectName("Subtle")
-        for widget in (self.title, self.subtitle, self.homepage, self.info, self.note):
+        self._labels = (self.title, self.subtitle, self.homepage,
+                        self.info, self.note)
+        for widget in self._labels:
+            widget.setSizePolicy(QSizePolicy.Policy.Preferred,
+                                 QSizePolicy.Policy.Minimum)
             root.addWidget(widget)
 
         grid = QGridLayout()
@@ -109,11 +180,23 @@ class DetailPanel(QFrame):
         for i, (key, label) in enumerate(self.ACTIONS):
             button = QPushButton(label)
             button.setEnabled(False)
+            button.setSizePolicy(QSizePolicy.Policy.Preferred,
+                                 QSizePolicy.Policy.Fixed)
             button.clicked.connect(lambda _=False, k=key: self._emit(k))
             self._buttons[key] = button
             grid.addWidget(button, i // 2, i % 2)
         root.addLayout(grid)
         root.addStretch(1)
+        self._sync_visibility()
+
+    @staticmethod
+    def _set_text(label: QLabel, text: str) -> None:
+        label.setText(text)
+        label.setVisible(bool(text))
+
+    def _sync_visibility(self) -> None:
+        for label in self._labels:
+            label.setVisible(bool(label.text()))
 
     def _emit(self, action: str) -> None:
         if self._spec:
@@ -124,30 +207,37 @@ class DetailPanel(QFrame):
         for button in self._buttons.values():
             button.setEnabled(spec is not None)
         if spec is None:
-            self.title.setText("选择一个软件")
-            self.subtitle.setText("")
-            self.homepage.setText("")
-            self.info.setText("")
-            self.note.setText("")
+            self._set_text(self.title, "选择一个软件")
+            for label in self._labels[1:]:
+                self._set_text(label, "")
+            self.homepage.setToolTip("")
+            self.scroll.fit_content()
             return
-        self.title.setText(spec.name)
-        self.subtitle.setText(f"{spec.category} · {spec.id}")
-        self.homepage.setText(
-            f'<a href="{spec.homepage}">{spec.homepage}</a>' if spec.homepage else "")
-        self.note.setText(spec.note or "")
+        url = spec.homepage or ""
+        host = urlsplit(url).netloc or url
+        self._set_text(self.title, spec.name)
+        self._set_text(self.subtitle, f"{spec.category} · {spec.id}")
+        self._set_text(self.homepage,
+                       f'<a href="{url}">{host}</a>' if url else "")
+        self.homepage.setToolTip(url)
+        self._set_text(self.note, spec.note or "")
         self._buttons["download"].setEnabled(spec.downloadable)
         self._buttons["ignore"].setText("忽略此软件")
         if row:
             self.set_row(row)
+        else:
+            self.scroll.fit_content()
 
     def set_row(self, row: AppRow) -> None:
         if self._spec is None or row.spec.id != self._spec.id:
             return
-        self.info.setText(
+        self._set_text(
+            self.info,
             f"本地版本：{row.local or '—'}\n"
             f"最新版本：{row.remote or '—'}\n"
-            f"当前状态：{row.status_text}"
+            f"当前状态：{row.status_text}",
         )
+        self.scroll.fit_content()
 
 
 class ActivityPanel(QFrame):

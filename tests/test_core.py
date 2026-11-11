@@ -297,5 +297,57 @@ class LocalizationTests(unittest.TestCase):
         self.assertEqual(window.activity.minimum_level().name, "INFO")
 
 
+class DetailPanelLayoutTests(unittest.TestCase):
+    def test_short_panel_scrolls_instead_of_squeezing_content(self):
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+        from app.core.registry import all_specs
+        from app.ui.table_model import AppRow
+        from app.ui.widgets import DetailPanel
+
+        app = QApplication.instance() or QApplication([])
+        spec = max(all_specs(),
+                   key=lambda s: len((s.note or "") + (s.homepage or "")))
+        row = AppRow(spec=spec, local="1.0.0", remote="2.0.0",
+                     needs_update=True)
+        panel = DetailPanel()
+        panel.set_spec(spec, row)
+        panel.show()
+        panel.resize(260, 90)
+        app.processEvents()
+
+        self.assertGreater(panel.scroll.verticalScrollBar().maximum(), 0)
+        self.assertEqual(panel.content.width(),
+                         panel.scroll.viewport().width())
+        self.assertGreater(panel.content.height(),
+                           panel.scroll.viewport().height())
+        for label in (panel.title, panel.subtitle, panel.homepage,
+                      panel.info, panel.note):
+            if label.isVisible():
+                self.assertGreaterEqual(label.height(),
+                                        label.sizeHint().height())
+        for button in panel._buttons.values():
+            self.assertGreaterEqual(button.height(),
+                                    button.minimumSizeHint().height())
+
+        panel.set_spec(None)
+        app.processEvents()
+        self.assertTrue(panel.info.isHidden())
+        panel.close()
+
+    def test_empty_labels_do_not_take_space(self):
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+        from app.ui.widgets import DetailPanel
+        QApplication.instance() or QApplication([])
+
+        panel = DetailPanel()
+        self.assertFalse(panel.title.isHidden())
+        for label in (panel.subtitle, panel.homepage, panel.info, panel.note):
+            self.assertTrue(label.isHidden())
+
+
 if __name__ == "__main__":
     unittest.main()
