@@ -36,8 +36,7 @@ def _already_running() -> bool:
     socket = QLocalSocket()
     socket.connectToServer(INSTANCE_KEY)
     if socket.waitForConnected(300):
-        socket.writeData(b"show")
-        socket.flush()
+        socket.write(b"show")
         socket.waitForBytesWritten(300)
         socket.disconnectFromServer()
         return True
@@ -83,6 +82,24 @@ def run_cli(argv: list[str]) -> int:
     return 0
 
 
+def _install_chinese_translator(app) -> None:
+    """Translate Qt's built-in labels (OK / Cancel / Copy / ...) to Chinese."""
+    import PySide6
+    from pathlib import Path
+    from PySide6.QtCore import QLibraryInfo, QTranslator
+
+    translator = QTranslator(app)
+    folders = [
+        Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)),
+        Path(PySide6.__file__).resolve().parent / "translations",
+    ]
+    for folder in folders:
+        if (translator.load("qtbase_zh_CN", str(folder))
+                or translator.load("qt_zh_CN", str(folder))):
+            app.installTranslator(translator)
+            return
+
+
 def run(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     setup_logging()
@@ -95,7 +112,9 @@ def run(argv: list[str] | None = None) -> int:
     from PySide6.QtGui import QGuiApplication, QIcon
     from PySide6.QtNetwork import QLocalServer
     from PySide6.QtWidgets import QApplication
+    from . import __version__
     from .core.config import ICON_PATH
+    from .core.logging_setup import get_logger
     from .ui.main_window import MainWindow
     from .ui.theme import stylesheet
 
@@ -103,12 +122,16 @@ def run(argv: list[str] | None = None) -> int:
     app.setApplicationName("Update Scripts")
     app.setOrganizationName("Update Scripts")
     app.setQuitOnLastWindowClosed(False)
+    _install_chinese_translator(app)
 
     if _already_running():
         return 0
-    QLocalServer.removeServer(INSTANCE_KEY)
     server = QLocalServer()
-    server.listen(INSTANCE_KEY)
+    if not server.listen(INSTANCE_KEY):
+        # Only clear a stale endpoint when binding actually failed, so a live
+        # instance's server is never removed.
+        QLocalServer.removeServer(INSTANCE_KEY)
+        server.listen(INSTANCE_KEY)
 
     settings = load_settings()
     theme = settings.theme
@@ -122,7 +145,8 @@ def run(argv: list[str] | None = None) -> int:
     if ICON_PATH.exists():
         app.setWindowIcon(QIcon(str(ICON_PATH)))
 
-    window = MainWindow(settings, git_version())
+    get_logger().info("启动 Update Scripts %s（%s）", __version__, git_version())
+    window = MainWindow(settings, f"版本 {__version__}")
     server.newConnection.connect(lambda: (
         window.restore_from_tray(),
         server.nextPendingConnection().close(),

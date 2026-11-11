@@ -22,7 +22,7 @@ class Tray(QObject):
         menu.addSeparator()
         menu.addAction("检查全部", self.checkAllRequested.emit)
         menu.addAction("更新全部", self.updateAllRequested.emit)
-        menu.addAction("自更新 (git pull)", self.selfUpdateRequested.emit)
+        menu.addAction("升级软件", self.selfUpdateRequested.emit)
         menu.addSeparator()
         menu.addAction("退出", self.exitRequested.emit)
         self.icon.setContextMenu(menu)

@@ -110,7 +110,7 @@ class MainWindow(QMainWindow):
         self._apply_schedule()
         self._update_stats()
         self._update_activity()
-        self.activity.append_line(f"已加载 {self.model.rowCount()} 个软件，并发上限 {settings.concurrency}")
+        self.activity.append_line(f"已加载 {self.model.rowCount()} 个软件")
 
         if settings.run_on_start or settings.schedule_enabled:
             QTimer.singleShot(900, lambda: self._start(Mode.CHECK, all_visible=True))
@@ -214,7 +214,7 @@ class MainWindow(QMainWindow):
         menu = QMenu(self)
         menu.addAction("打开配置文件", lambda: services.open_path(str(CONFIG_PATH)))
         menu.addAction("已忽略的软件…", self._show_ignored)
-        menu.addAction("自更新 (git pull)", self._self_update)
+        menu.addAction("升级软件", self._self_update)
         menu.addSeparator()
         menu.addAction("关于", self._about)
         return menu
@@ -265,7 +265,7 @@ class MainWindow(QMainWindow):
         if mode in (Mode.UPDATE, Mode.FORCE) and len(targets) > 1:
             answer = QMessageBox.question(
                 self, "确认更新",
-                f"即将更新 {len(targets)} 个软件，期间会关闭相关程序并静默安装。\n是否继续？",
+                f"即将更新 {len(targets)} 个软件，期间会自动关闭相关程序并完成安装。\n是否继续？",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if answer != QMessageBox.StandardButton.Yes:
@@ -455,8 +455,9 @@ class MainWindow(QMainWindow):
     def _about(self) -> None:
         QMessageBox.about(
             self, "关于 Update Scripts",
-            "Update Scripts 2.0\n\nPySide6 重构版：声明式配方 + 结构化事件，"
-            "不再通过命令行逐脚本调用。\n旧版代码已归档至 legacy/。",
+            "Update Scripts 2.0\n\n"
+            "集中检查并升级常用软件。\n"
+            "支持定时检查、忽略不需要的软件；关闭窗口后可继续在托盘运行。",
         )
 
     def _apply_filter(self) -> None:
@@ -530,11 +531,12 @@ class MainWindow(QMainWindow):
         event.accept()
         QApplication.instance().quit()
 
-    # ------------------------------------------------------ self update / DnD
+    # -------------------------------------------------------- upgrade / DnD
     def _self_update(self) -> None:
-        self.activity.append_line("正在执行 git pull --rebase …")
+        self.activity.append_line("正在检查并获取最新版本…")
 
         def work() -> None:
+            from ..core.logging_setup import get_logger
             try:
                 result = subprocess.run(
                     ["git", "pull", "--rebase"], cwd=str(PROJECT_ROOT),
@@ -542,20 +544,27 @@ class MainWindow(QMainWindow):
                     text=True, encoding="utf-8", errors="replace", timeout=120,
                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
-                self._async.selfUpdateDone.emit(
-                    result.returncode == 0, (result.stdout or "")[-800:])
+                get_logger().info("升级软件输出：%s",
+                                  (result.stdout or "").strip()[-800:])
+                self._async.selfUpdateDone.emit(result.returncode == 0, "")
             except Exception as exc:
-                self._async.selfUpdateDone.emit(False, str(exc))
+                get_logger().warning("升级软件失败：%s", exc)
+                self._async.selfUpdateDone.emit(False, "")
 
         threading.Thread(target=work, daemon=True).start()
 
-    def _on_self_update_done(self, ok: bool, message: str) -> None:
-        self.activity.append_line("自更新：" + ("成功" if ok else "失败") + f" {message[:160]}")
+    def _on_self_update_done(self, ok: bool, _detail: str = "") -> None:
+        self.activity.append_line(
+            "升级软件：已完成" if ok else "升级软件：未完成")
         if not ok:
-            QMessageBox.warning(self, "自更新失败", message[-600:])
+            QMessageBox.warning(
+                self, "升级失败",
+                "暂时无法获取最新版本，请检查网络连接后稍后重试。\n"
+                "详细信息已写入日志。",
+            )
             return
         answer = QMessageBox.question(
-            self, "自更新完成", "代码已更新，是否重启应用？",
+            self, "升级完成", "已升级到最新版本，是否现在重启应用？",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if answer == QMessageBox.StandardButton.Yes:
             QProcess.startDetached(pythonw_executable(), [str(MAIN_SCRIPT)])

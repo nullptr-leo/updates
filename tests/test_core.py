@@ -220,5 +220,82 @@ class CacheConcurrencyTests(unittest.TestCase):
         self.assertTrue(events[-1].finished)
 
 
+class LogLevelTests(unittest.TestCase):
+    def test_phase_levels_are_graded(self):
+        from app.core.models import LogLevel, Phase, ProgressEvent, level_for_phase
+        self.assertEqual(level_for_phase(Phase.CHECKING), LogLevel.DEBUG)
+        self.assertEqual(level_for_phase(Phase.DOWNLOADING), LogLevel.DEBUG)
+        self.assertEqual(level_for_phase(Phase.FAILED), LogLevel.ERROR)
+        self.assertEqual(level_for_phase(Phase.DONE), LogLevel.INFO)
+        self.assertEqual(
+            ProgressEvent(app_id="x", phase=Phase.FAILED).effective_level,
+            LogLevel.ERROR)
+        self.assertEqual(
+            ProgressEvent(app_id="x", phase=Phase.CHECKING,
+                          level=LogLevel.WARNING).effective_level,
+            LogLevel.WARNING)
+
+    def test_activity_panel_defaults_to_info_and_filters_history(self):
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+        from app.core.models import LogLevel, Phase, ProgressEvent
+        from app.ui.widgets import ActivityPanel
+        QApplication.instance() or QApplication([])
+
+        panel = ActivityPanel()
+        self.assertEqual(panel.minimum_level(), LogLevel.INFO)
+        panel.append_event(ProgressEvent(app_id="a", phase=Phase.CHECKING))
+        panel.append_event(ProgressEvent(app_id="b", phase=Phase.DONE))
+        panel.append_event(ProgressEvent(app_id="c", phase=Phase.FAILED))
+        text = panel.log.toPlainText()
+        self.assertNotIn("检查中", text)
+        self.assertIn("完成", text)
+        self.assertIn("失败", text)
+
+        panel.level_combo.setCurrentIndex(0)  # 详细 / DEBUG
+        self.assertIn("检查中", panel.log.toPlainText())
+
+        panel.level_combo.setCurrentIndex(
+            panel.level_combo.findData(int(LogLevel.ERROR)))
+        text = panel.log.toPlainText()
+        self.assertIn("失败", text)
+        self.assertNotIn("检查中", text)
+        self.assertNotIn("完成", text)
+
+    def test_log_context_menu_is_chinese(self):
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QApplication
+        from app.ui.widgets import ActivityPanel
+        QApplication.instance() or QApplication([])
+        panel = ActivityPanel()
+        self.assertEqual(panel.log.contextMenuPolicy(),
+                         Qt.ContextMenuPolicy.CustomContextMenu)
+
+
+class LocalizationTests(unittest.TestCase):
+    def test_menus_are_chinese_and_hide_git_details(self):
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+        from app.core.config import load_settings
+        from app.ui.main_window import MainWindow
+        from app.ui.tray import Tray
+        QApplication.instance() or QApplication([])
+
+        tray = Tray("")
+        tray_texts = [a.text() for a in tray.icon.contextMenu().actions()]
+        self.assertIn("升级软件", tray_texts)
+        self.assertFalse(any("git" in t.lower() for t in tray_texts))
+
+        window = MainWindow(load_settings(), "版本 2.0")
+        more_texts = [a.text() for a in window.more_btn.menu().actions()]
+        self.assertIn("升级软件", more_texts)
+        self.assertFalse(any("git" in t.lower() for t in more_texts))
+        self.assertEqual(window.activity.minimum_level().name, "INFO")
+
+
 if __name__ == "__main__":
     unittest.main()

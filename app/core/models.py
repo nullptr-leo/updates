@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, IntEnum
 from typing import Any, Mapping
 
 
@@ -31,6 +31,23 @@ class Cancelled(UpdateError):
 
 class TimedOut(UpdateError):
     """The task exceeded its time budget."""
+
+
+class LogLevel(IntEnum):
+    """Severity of a log record; higher value means more important."""
+    DEBUG = 10
+    INFO = 20
+    WARNING = 30
+    ERROR = 40
+
+    @property
+    def label(self) -> str:
+        return {
+            LogLevel.DEBUG: "调试",
+            LogLevel.INFO: "信息",
+            LogLevel.WARNING: "警告",
+            LogLevel.ERROR: "错误",
+        }[self]
 
 
 class Phase(Enum):
@@ -59,6 +76,28 @@ TERMINAL_PHASES = frozenset({
 })
 SUCCESS_PHASES = frozenset({Phase.DONE, Phase.UPTODATE, Phase.DOWNLOADED})
 ERROR_PHASES = frozenset({Phase.FAILED, Phase.CANCELLED, Phase.SKIPPED})
+
+# Noisy intermediate states are DEBUG; results and problems are always visible
+# at the default INFO level.
+PHASE_LOG_LEVEL: dict[Phase, LogLevel] = {
+    Phase.IDLE: LogLevel.DEBUG,
+    Phase.QUEUED: LogLevel.DEBUG,
+    Phase.CHECKING: LogLevel.DEBUG,
+    Phase.PREPARING: LogLevel.INFO,
+    Phase.DOWNLOADING: LogLevel.DEBUG,
+    Phase.INSTALLING: LogLevel.INFO,
+    Phase.DONE: LogLevel.INFO,
+    Phase.UPTODATE: LogLevel.DEBUG,
+    Phase.SKIPPED: LogLevel.WARNING,
+    Phase.DOWNLOADED: LogLevel.INFO,
+    Phase.MANUAL: LogLevel.WARNING,
+    Phase.FAILED: LogLevel.ERROR,
+    Phase.CANCELLED: LogLevel.WARNING,
+}
+
+
+def level_for_phase(phase: Phase) -> LogLevel:
+    return PHASE_LOG_LEVEL.get(phase, LogLevel.INFO)
 
 
 class Mode(Enum):
@@ -181,6 +220,11 @@ class ProgressEvent:
     error: ErrorInfo | None = None
     finished: bool = False
     timestamp: float = field(default_factory=time.time)
+    level: LogLevel | None = None
+
+    @property
+    def effective_level(self) -> LogLevel:
+        return self.level if self.level is not None else level_for_phase(self.phase)
 
     @property
     def percent(self) -> float:

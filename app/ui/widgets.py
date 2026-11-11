@@ -3,18 +3,19 @@ panel and settings dialog."""
 from __future__ import annotations
 
 import time
+from collections import deque
 from dataclasses import replace
 
 from PySide6.QtCore import QRect, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QPainter, QPen
+from PySide6.QtGui import QBrush, QColor, QPainter, QPen, QTextCursor
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
-    QFrame, QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QProgressBar,
+    QFrame, QHBoxLayout, QLabel, QLineEdit, QMenu, QPlainTextEdit, QProgressBar,
     QPushButton, QSpinBox, QStyledItemDelegate, QVBoxLayout, QGridLayout,
 )
 
 from ..core.config import Settings
-from ..core.models import AppSpec, ProgressEvent
+from ..core.models import AppSpec, LogLevel, ProgressEvent
 from .table_model import AppRow
 
 
@@ -150,9 +151,23 @@ class DetailPanel(QFrame):
 
 
 class ActivityPanel(QFrame):
+    """Live log with severity filtering. Default level: INFO ("常规").
+
+    All records are kept in memory so switching the level re-renders history
+    instead of only affecting future lines.
+    """
+    LEVEL_CHOICES = (
+        (LogLevel.DEBUG, "详细"),
+        (LogLevel.INFO, "常规"),
+        (LogLevel.WARNING, "重要"),
+        (LogLevel.ERROR, "仅错误"),
+    )
+
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("Card")
+        self._records: deque[tuple[LogLevel, str]] = deque(maxlen=3000)
+        self._min_level = LogLevel.INFO
         root = QVBoxLayout(self)
         root.setContentsMargins(12, 10, 12, 10)
         head = QHBoxLayout()
@@ -163,13 +178,21 @@ class ActivityPanel(QFrame):
         self.progress = QProgressBar()
         self.progress.setFixedHeight(8)
         self.progress.setTextVisible(False)
-        clear = QPushButton("清空")
+        self.level_combo = QComboBox()
+        for level, label in self.LEVEL_CHOICES:
+            self.level_combo.addItem(label, int(level))
+        self.level_combo.setFixedWidth(96)
+        self.level_combo.setCurrentIndex(1)
+        self.level_combo.currentIndexChanged.connect(self._on_level_changed)
+        clear = QPushButton("清空日志")
         export = QPushButton("导出日志")
-        clear.clicked.connect(lambda: self.log.clear())
+        clear.clicked.connect(self.clear_log)
         export.clicked.connect(self.export_log)
         head.addWidget(title)
         head.addWidget(self.summary, 1)
         head.addWidget(self.progress, 2)
+        head.addWidget(QLabel("日志等级"))
+        head.addWidget(self.level_combo)
         head.addWidget(clear)
         head.addWidget(export)
         root.addLayout(head)
@@ -177,32 +200,79 @@ class ActivityPanel(QFrame):
         self.log.setReadOnly(True)
         self.log.setMaximumBlockCount(3000)
         self.log.setMinimumHeight(110)
+        self.log.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.log.customContextMenuRequested.connect(self._show_log_menu)
         root.addWidget(self.log)
 
+    # ------------------------------------------------------------- levels
+    def minimum_level(self) -> LogLevel:
+        return self._min_level
+
+    def _on_level_changed(self, index: int) -> None:
+        value = self.level_combo.itemData(index)
+        if value is None:
+            return
+        self._min_level = LogLevel(int(value))
+        self._refresh()
+
+    def _refresh(self) -> None:
+        self.log.setPlainText(
+            "\n".join(text for level, text in self._records
+                      if level >= self._min_level)
+        )
+        self.log.moveCursor(QTextCursor.MoveOperation.End)
+
+    def _record(self, level: LogLevel, text: str) -> None:
+        self._records.append((level, text))
+        if level >= self._min_level:
+            self.log.appendPlainText(text)
+
+    def clear_log(self) -> None:
+        self._records.clear()
+        self.log.clear()
+
+    # ------------------------------------------------------------- append
     def append_event(self, ev: ProgressEvent) -> None:
         stamp = time.strftime("%H:%M:%S", time.localtime(ev.timestamp))
+        level = ev.effective_level
         extra = f" — {ev.message}" if ev.message else ""
-        self.log.appendPlainText(f"[{stamp}] {ev.phase.value:<6} {ev.app_id}{extra}")
+        self._record(
+            level,
+            f"[{stamp}] [{level.label}] {ev.phase.value:<6} {ev.app_id}{extra}",
+        )
 
-    def append_line(self, text: str) -> None:
+    def append_line(self, text: str,
+                    level: LogLevel = LogLevel.INFO) -> None:
         stamp = time.strftime("%H:%M:%S")
-        self.log.appendPlainText(f"[{stamp}] {text}")
+        self._record(level, f"[{stamp}] [{level.label}] {text}")
 
     def set_progress(self, done: int, total: int, active: int,
                      concurrency: int) -> None:
         self.progress.setRange(0, max(1, total))
         self.progress.setValue(done)
         self.summary.setText(
-            f"整体 {done}/{total} · 并发 {active}/{concurrency}" if total
-            else f"就绪 · 并发限制 {concurrency}"
+            f"整体 {done}/{total} · 同时进行 {active}/{concurrency}" if total
+            else f"就绪 · 同时最多处理 {concurrency} 个"
         )
+
+    # ------------------------------------------------------------ actions
+    def _show_log_menu(self, pos) -> None:
+        menu = QMenu(self)
+        copy = menu.addAction("复制")
+        copy.setEnabled(self.log.textCursor().hasSelection())
+        copy.triggered.connect(self.log.copy)
+        menu.addAction("全选", self.log.selectAll)
+        menu.addSeparator()
+        menu.addAction("清空日志", self.clear_log)
+        menu.addAction("导出日志…", self.export_log)
+        menu.exec(self.log.viewport().mapToGlobal(pos))
 
     def export_log(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
-            self, "导出日志", "update-scripts.log", "Text (*.log *.txt)")
+            self, "导出日志", "update-scripts.log", "文本文件 (*.log *.txt)")
         if path:
             with open(path, "w", encoding="utf-8") as fh:
-                fh.write(self.log.toPlainText())
+                fh.write("\n".join(text for _, text in self._records))
 
 
 class SettingsDialog(QDialog):
