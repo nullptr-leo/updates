@@ -41,7 +41,7 @@ def update_app():
 
         # extract and update files
         updater.taskkill('git-cmd.exe')
-        updater.run_installer(download_path)
+        updater.run_installer(download_path, '/verysilent')
 
     updater.finish()
 
