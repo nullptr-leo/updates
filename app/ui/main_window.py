@@ -36,9 +36,23 @@ from .widgets import (
 )
 
 
+def _git_head() -> str:
+    """Current HEAD hash, or "" when git metadata is unavailable."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=str(PROJECT_ROOT),
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            text=True, encoding="utf-8", errors="replace", timeout=30,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        return (result.stdout or "").strip()
+    except Exception:
+        return ""
+
+
 class _AsyncSignals(QObject):
     archiveDone = Signal(bool, str)
-    selfUpdateDone = Signal(bool, str)
+    selfUpdateDone = Signal(bool, bool)
 
 
 class IgnoredDialog(QDialog):
@@ -600,31 +614,43 @@ class MainWindow(QMainWindow):
         def work() -> None:
             from ..core.logging_setup import get_logger
             try:
+                before = _git_head()
                 result = subprocess.run(
                     ["git", "pull", "--rebase"], cwd=str(PROJECT_ROOT),
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                     text=True, encoding="utf-8", errors="replace", timeout=120,
                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
-                get_logger().info("升级软件输出：%s",
-                                  (result.stdout or "").strip()[-800:])
-                self._async.selfUpdateDone.emit(result.returncode == 0, "")
+                output = (result.stdout or "").strip()
+                get_logger().info("升级软件输出：%s", output[-800:])
+                after = _git_head()
+                ok = result.returncode == 0
+                # A no-op pull leaves HEAD unchanged: no restart is needed.
+                # If HEAD is unavailable, fall back to git's own wording.
+                if ok and before and after:
+                    changed = before != after
+                else:
+                    changed = ok and "up to date" not in output.lower()
+                self._async.selfUpdateDone.emit(ok, changed)
             except Exception as exc:
                 get_logger().warning("升级软件失败：%s", exc)
-                self._async.selfUpdateDone.emit(False, "")
+                self._async.selfUpdateDone.emit(False, False)
 
         threading.Thread(target=work, daemon=True).start()
 
-    def _on_self_update_done(self, ok: bool, _detail: str = "") -> None:
-        self.activity.append_line(
-            "升级软件：已完成" if ok else "升级软件：未完成")
+    def _on_self_update_done(self, ok: bool, changed: bool = True) -> None:
         if not ok:
+            self.activity.append_line("升级软件：未完成")
             QMessageBox.warning(
                 self, "升级失败",
                 "暂时无法获取最新版本，请检查网络连接后稍后重试。\n"
                 "详细信息已写入日志。",
             )
             return
+        if not changed:
+            self.activity.append_line("升级软件：已是最新版本，无需重启")
+            return
+        self.activity.append_line("升级软件：已完成")
         answer = QMessageBox.question(
             self, "升级完成", "已升级到最新版本，是否现在重启应用？",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)

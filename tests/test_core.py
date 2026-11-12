@@ -1113,5 +1113,72 @@ class ArchiveFallbackTests(unittest.TestCase):
             winrar.assert_not_called()
 
 
+class _ImmediateThread:
+    def __init__(self, target, daemon=False):
+        self.target = target
+
+    def start(self):
+        self.target()
+
+
+class SelfUpdateTests(unittest.TestCase):
+    def setUp(self):
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+        from app.ui.main_window import MainWindow
+        QApplication.instance() or QApplication([])
+        with patch("app.ui.main_window.visible_specs", return_value=[]), \
+             patch("app.ui.main_window.cache.load_cache", return_value={}):
+            self.window = MainWindow(
+                Settings(run_on_start=False, schedule_enabled=False))
+        self.window._async.selfUpdateDone.disconnect(
+            self.window._on_self_update_done)
+        self.emitted = []
+        self.window._async.selfUpdateDone.connect(
+            lambda ok, changed: self.emitted.append((ok, changed)))
+
+    def _pull(self, heads, pull_output, returncode=0):
+        from types import SimpleNamespace
+        remaining = iter(heads)
+
+        def fake_run(args, **kwargs):
+            if args[:2] == ["git", "rev-parse"]:
+                return SimpleNamespace(stdout=next(remaining), returncode=0)
+            return SimpleNamespace(stdout=pull_output, returncode=returncode)
+
+        with patch("app.ui.main_window.subprocess.run",
+                   side_effect=fake_run), \
+             patch("app.ui.main_window.threading.Thread",
+                   side_effect=_ImmediateThread):
+            self.window._self_update()
+
+    def test_already_up_to_date_does_not_prompt_restart(self):
+        with patch.object(self.window.activity, "append_line") as append, \
+             patch("app.ui.main_window.QMessageBox") as box:
+            self.window._on_self_update_done(True, False)
+            box.question.assert_not_called()
+            box.warning.assert_not_called()
+            append.assert_called_once_with("升级软件：已是最新版本，无需重启")
+
+    def test_new_commits_still_ask_for_restart(self):
+        with patch("app.ui.main_window.QMessageBox") as box, \
+             patch("app.ui.main_window.QProcess.startDetached") as start, \
+             patch.object(self.window, "quit_app") as quit_app:
+            box.question.return_value = None
+            self.window._on_self_update_done(True, True)
+            box.question.assert_called_once()
+            start.assert_not_called()
+            quit_app.assert_not_called()
+
+    def test_no_new_commits_emit_unchanged(self):
+        self._pull(["abc123\n", "abc123\n"], "Already up to date.\n")
+        self.assertEqual(self.emitted, [(True, False)])
+
+    def test_new_commits_emit_changed(self):
+        self._pull(["abc123\n", "def456\n"], "Updating abc123..def456\n")
+        self.assertEqual(self.emitted, [(True, True)])
+
+
 if __name__ == "__main__":
     unittest.main()
