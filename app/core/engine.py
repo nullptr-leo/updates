@@ -61,6 +61,20 @@ def _friendly(exc: BaseException) -> str:
     return str(exc) or name
 
 
+def _version_label(version: str, date: Any) -> str:
+    """Display helper: ``3.0.22`` + build date -> ``3.0.22 (2026-11-12)``.
+
+    Only used for the UI strings: version comparison, download URLs and
+    package names keep using the plain version.
+    """
+    stamp = str(date or "").strip()
+    if not version or not stamp or not stamp.strip("0"):
+        return version
+    if len(stamp) == 8 and stamp.isdigit():
+        stamp = f"{stamp[:4]}-{stamp[4:6]}-{stamp[6:]}"
+    return f"{version} ({stamp})"
+
+
 class Context:
     """Small facade passed to custom recipe hooks."""
 
@@ -398,15 +412,21 @@ class UpdateEngine:
                     if mode != Mode.CHECK:
                         raise
                     local = ""
-                self._send(spec, Phase.CHECKING, message="查询最新版本",
-                           local_version=local)
+                # Do not publish the plain version here: the remote resolver
+                # supplies the build date, and sending a bare "3.0.25" would
+                # overwrite the date-decorated label already in the table.
+                self._send(spec, Phase.CHECKING, message="查询最新版本")
 
                 info = self._remote_info(spec, ctx)
-                remote = info.version
-                needs = services.is_newer(remote, local,
+                version = info.version
+                needs = services.is_newer(version, local,
                                           lexicographic=spec.lexicographic)
                 if mode.is_force or info.extra.get("force_update"):
                     needs = True
+                # Build dates are display-only; version comparison, download
+                # URLs and package names keep using the plain version string.
+                local = _version_label(local, info.extra.get("local_date"))
+                remote = _version_label(version, info.extra.get("remote_date"))
                 self._send(spec, Phase.CHECKING, message="", local_version=local,
                            remote_version=remote, needs_update=needs)
                 cache.update_app_cache(spec.id, local=local, remote=remote,
@@ -445,7 +465,7 @@ class UpdateEngine:
                     if mode == Mode.DOWNLOAD_ONLY:
                         target_dir = download_dir()
                         os.makedirs(target_dir, exist_ok=True)
-                        filename = (f"{spec.id}-{remote}{ext}" if remote
+                        filename = (f"{spec.id}-{version}{ext}" if version
                                     else f"{spec.id}{ext}")
                         shutil.copy2(dest, os.path.join(target_dir, filename))
                         self._send(spec, Phase.DOWNLOADED, message=filename,

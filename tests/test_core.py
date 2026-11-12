@@ -520,6 +520,68 @@ class DetailPanelLayoutTests(unittest.TestCase):
             self.assertTrue(label.isHidden())
 
 
+class VlcVersionLabelTests(unittest.TestCase):
+    def test_version_label_formats_build_date(self):
+        from app.core.engine import _version_label
+        self.assertEqual(_version_label("3.0.22", "20261112"),
+                         "3.0.22 (2026-11-12)")
+        self.assertEqual(_version_label("3.0.22", "0"), "3.0.22")
+        self.assertEqual(_version_label("3.0.22", None), "3.0.22")
+        self.assertEqual(_version_label("", "20261112"), "")
+
+    def test_vlc_hook_exposes_both_build_dates(self):
+        from app.apps.hooks import remote_vlc
+
+        class FakeCtx:
+            def get(self, url, **kwargs):
+                if url.endswith("nightly-win64/"):
+                    return '<a href="20261112-0430/">20261112-0430/</a>'
+                return '<a href="vlc-3.0.22-20261112-0430.7z">vlc</a>'
+
+            def install_dir(self, create=False):
+                raise FileNotFoundError("not installed")
+
+        info = remote_vlc(FakeCtx())
+        self.assertEqual(info.version, "3.0.22")
+        self.assertEqual(info.extra["remote_date"], "20261112")
+        self.assertEqual(info.extra["local_date"], "0")
+        self.assertTrue(info.extra["force_update"])
+
+    def test_engine_shows_dates_without_changing_version_logic(self):
+        from app.core import cache
+        from app.core.models import RemoteInfo
+
+        spec = AppSpec(
+            id="vlc", name="VLC",
+            local=LocalSpec(kind="exe", target="vlc.exe"),
+            remote=RemoteSpec(kind="custom", custom="vlc"),
+            install=InstallSpec(kind="installer"),
+        )
+        events = []
+        engine = UpdateEngine(Settings(), events.append, hooks=HOOKS)
+        info = RemoteInfo(version="3.0.22", extra={
+            "remote_date": "20261112", "local_date": "20261001",
+            "force_update": False,
+        })
+        with patch.object(services, "network_status",
+                          return_value=(True, "网络已连接")), \
+             patch.object(services, "get_local_version", return_value="3.0.22"), \
+             patch.object(engine, "_remote_info", return_value=info), \
+             patch.object(cache, "update_app_cache") as save:
+            engine.run(spec, Mode.CHECK, CancellationToken())
+        final = events[-1]
+        self.assertEqual(final.local_version, "3.0.22 (2026-10-01)")
+        self.assertEqual(final.remote_version, "3.0.22 (2026-11-12)")
+        self.assertEqual(save.call_args.kwargs["remote"],
+                         "3.0.22 (2026-11-12)")
+        # No intermediate "检查中" event may publish a bare version number and
+        # make the table flicker back from "3.0.22 (2026-11-12)" to "3.0.22".
+        local_labels = [e.local_version for e in events if e.local_version]
+        self.assertEqual(set(local_labels), {"3.0.22 (2026-10-01)"})
+        remote_labels = [e.remote_version for e in events if e.remote_version]
+        self.assertEqual(set(remote_labels), {"3.0.22 (2026-11-12)"})
+
+
 class RemoteParsingTests(unittest.TestCase):
     def test_listary_uses_full_version_not_major_banner(self):
         spec = spec_by_id("listary")

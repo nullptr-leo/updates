@@ -101,7 +101,8 @@ def remote_vlc(ctx) -> RemoteInfo:
         pass
     return RemoteInfo(
         version=version, url=listing + info, text=text,
-        extra={"force_update": remote_date > local_date, "remote_date": remote_date},
+        extra={"force_update": remote_date > local_date,
+               "remote_date": remote_date, "local_date": local_date},
     )
 
 
