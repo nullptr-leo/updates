@@ -26,7 +26,7 @@ from packaging import version as pkg_version
 from .atomic_io import rmtree_with_retry, temporary_workspace
 from .cancellation import CancellationToken
 from .config import Settings, UNRAR_DLL
-from .models import Cancelled, LocalSpec, NotInstalled, QueryFailed, TimedOut
+from .models import AppSpec, Cancelled, LocalSpec, NotInstalled, QueryFailed, TimedOut
 from .ports import CREATE_NO_WINDOW, ProcessPort, SubprocessPort
 
 try:
@@ -160,7 +160,21 @@ def is_connection_error(exc: BaseException) -> bool:
     return False
 
 
-def _proxies(settings: Settings | None) -> dict | None:
+def _use_proxy(settings: Settings | None,
+               spec: AppSpec | None = None) -> bool:
+    rules = getattr(settings, "proxy_rules", None) or {}
+    rule = rules.get(spec.id) if spec else None
+    if rule == "proxy":
+        return True
+    if rule == "direct":
+        return False
+    return spec.proxy if spec else True
+
+
+def _proxies(settings: Settings | None,
+             spec: AppSpec | None = None) -> dict | None:
+    if not _use_proxy(settings, spec):
+        return None
     addr = (settings.proxy if settings else "") or os.environ.get("UPDATE_PROXY_ADDR", "")
     if not addr:
         return None
@@ -175,6 +189,7 @@ def http_get(
     url: str,
     *,
     settings: Settings | None = None,
+    spec: AppSpec | None = None,
     headers: dict | None = None,
     timeout: int = 30,
 ) -> str:
@@ -183,7 +198,7 @@ def http_get(
         response = requests.get(
             url,
             headers={**DEFAULT_HEADERS, **(headers or {})},
-            proxies=_proxies(settings),
+            proxies=_proxies(settings, spec),
             verify=_verify(settings),
             timeout=(10, timeout),
         )
@@ -195,13 +210,14 @@ def http_get(
         raise QueryFailed(str(exc) or repr(exc)) from exc
 
 
-def get_redirected_url(url: str, *, settings: Settings | None = None) -> str:
+def get_redirected_url(url: str, *, settings: Settings | None = None,
+                       spec: AppSpec | None = None) -> str:
     """Resolve the final URL after redirects (HEAD, then streaming GET)."""
     try:
         response = requests.head(
             url,
             headers=DEFAULT_HEADERS,
-            proxies=_proxies(settings),
+            proxies=_proxies(settings, spec),
             verify=_verify(settings),
             allow_redirects=True,
             timeout=(10, 30),
@@ -211,17 +227,18 @@ def get_redirected_url(url: str, *, settings: Settings | None = None) -> str:
         raise ValueError("HEAD did not redirect")
     except Exception:
         try:
-            with closing_get(url, settings=settings) as response:
+            with closing_get(url, settings=settings, spec=spec) as response:
                 return response.url
         except Exception as exc:
             raise QueryFailed(f"重定向查询失败: {exc}") from exc
 
 
-def closing_get(url: str, *, settings: Settings | None = None):
+def closing_get(url: str, *, settings: Settings | None = None,
+                spec: AppSpec | None = None):
     return requests.get(
         url,
         headers=DEFAULT_HEADERS,
-        proxies=_proxies(settings),
+        proxies=_proxies(settings, spec),
         verify=_verify(settings),
         stream=True,
         allow_redirects=True,
@@ -261,6 +278,7 @@ def download_file(
     dest: str,
     *,
     settings: Settings | None = None,
+    spec: AppSpec | None = None,
     token: CancellationToken | None = None,
     headers: dict | None = None,
     on_progress: Callable[[int, int], None] | None = None,
@@ -272,7 +290,7 @@ def download_file(
         with closing(requests.get(
             url,
             headers={**DEFAULT_HEADERS, **(headers or {})},
-            proxies=_proxies(settings),
+            proxies=_proxies(settings, spec),
             verify=_verify(settings),
             stream=True,
             timeout=(30, 120),

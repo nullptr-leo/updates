@@ -87,6 +87,8 @@ class Settings:
     search_paths: list[str] = field(default_factory=default_search_paths)
     theme: str = "system"
     proxy: str = ""
+    # app_id -> "proxy" | "direct"; a missing key falls back to AppSpec.proxy.
+    proxy_rules: dict[str, str] = field(default_factory=dict)
     verify_tls: bool = True
     minimize_to_tray: bool = True
 
@@ -111,6 +113,8 @@ class Settings:
             if "auto_install_updates" not in raw:
                 cfg.auto_install_updates = bool(raw.get("auto_update"))
         cfg.schema = 2
+        if not isinstance(cfg.proxy_rules, dict):
+            cfg.proxy_rules = {}
         cfg.concurrency = max(1, min(16, int(cfg.concurrency)))
         cfg.schedule_minutes = max(5, int(cfg.schedule_minutes))
         return cfg

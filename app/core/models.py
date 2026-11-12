@@ -193,6 +193,8 @@ class AppSpec:
     manual_only: bool = False
     archive_handler: str = ""
     note: str = ""
+    # Recipe-level proxy policy: True uses the configured proxy, False connects
+    # directly. A per-app user rule (Settings.proxy_rules) takes precedence.
     proxy: bool = True
     lexicographic: bool = False
 

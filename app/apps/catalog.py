@@ -7,6 +7,8 @@ which silently broke "open homepage".
 """
 from __future__ import annotations
 
+from dataclasses import replace
+
 from ..core.models import DownloadSpec, InstallSpec, LocalSpec, RemoteSpec
 from .base import (
     custom_remote, exe, extract, from_response, installer, make, redirect,
@@ -400,6 +402,20 @@ SPECS = (
          post=("taskkill:Weixin.exe", "open_url:", "custom:weixin_cleanup"),
          manual_only=True, archive_handler="weixin",
          note="论坛有 JS 挑战，必要时调用无头 Edge；可拖放压缩包安装"),
+)
+
+# ------------------------------------------------------------------ proxy
+# 配方默认使用设置中的全局代理；下列软件默认直连，不使用全局代理。
+# 用户可在表格右键「代理策略」中逐个覆盖（Settings.proxy_rules）。
+DIRECT_PROXY_APPS = frozenset({
+    "adb", "kiro", "winrar", "bcompare", "gety", "listary", "pdfshaper",
+    "qianwen", "snipaste", "ticktick", "workbuddy", "wps", "xmind",
+    "insta360", "alipan", "feishu", "foxmail", "meeting", "qq", "wecom",
+    "weixin",
+})
+SPECS = tuple(
+    replace(spec, proxy=False) if spec.id in DIRECT_PROXY_APPS else spec
+    for spec in SPECS
 )
 
 __all__ = ["SPECS"]

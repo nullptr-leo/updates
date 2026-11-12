@@ -231,6 +231,7 @@ class MainWindow(QMainWindow):
         menu.addAction("打开配置文件", lambda: services.open_path(str(CONFIG_PATH)))
         menu.addAction("已忽略的软件…", self._show_ignored)
         menu.addAction("升级软件", self._self_update)
+        menu.addAction("恢复全部软件默认代理策略", self._reset_proxy_rules)
         menu.addSeparator()
         menu.addAction("关于", self._about)
         return menu
@@ -397,6 +398,18 @@ class MainWindow(QMainWindow):
             action.triggered.connect(
                 lambda _=False, m=mode, s=list(specs): self._start(m, s))
         menu.addSeparator()
+        proxy_menu = menu.addMenu("代理策略")
+        rules = self.settings.proxy_rules
+        if not isinstance(rules, dict):
+            rules = {}
+        for label, value in ((f"默认({self._proxy_default_text(specs)})", "auto"),
+                             ("代理", "proxy"), ("直连", "direct")):
+            action = proxy_menu.addAction(label)
+            action.setCheckable(True)
+            action.setChecked(all(rules.get(s.id, "auto") == value for s in specs))
+            action.triggered.connect(
+                lambda _=False, v=value, s=list(specs): self._set_proxy_rules(s, v))
+        menu.addSeparator()
         menu.addAction("停止所选任务", lambda: [self.pool.cancel(s.id) for s in specs])
         menu.addSeparator()
         menu.addAction("打开程序", lambda: [self._open_program(s) for s in specs])
@@ -405,6 +418,38 @@ class MainWindow(QMainWindow):
         menu.addSeparator()
         menu.addAction("忽略", lambda: [self._ignore(s.id) for s in specs])
         menu.exec(self.table.viewport().mapToGlobal(pos))
+
+    @staticmethod
+    def _proxy_default_text(specs: list[AppSpec]) -> str:
+        defaults = {s.proxy for s in specs}
+        if len(defaults) > 1:
+            return "混合"
+        return "代理" if True in defaults else "直连"
+
+    def _set_proxy_rules(self, specs: list[AppSpec], value: str) -> None:
+        rules = self.settings.proxy_rules
+        if not isinstance(rules, dict):
+            rules = {}
+            self.settings.proxy_rules = rules
+        for spec in specs:
+            if value == "auto":
+                rules.pop(spec.id, None)
+            else:
+                rules[spec.id] = value
+        save_settings(self.settings)
+        text = {"auto": f"默认({self._proxy_default_text(specs)})",
+                "proxy": "代理", "direct": "直连"}[value]
+        self.activity.append_line(
+            f"代理策略 → {text}：" + ", ".join(s.id for s in specs))
+
+    def _reset_proxy_rules(self) -> None:
+        rules = self.settings.proxy_rules
+        if not isinstance(rules, dict) or not rules:
+            self.activity.append_line("当前没有自定义代理策略")
+            return
+        rules.clear()
+        save_settings(self.settings)
+        self.activity.append_line("已恢复所有软件为配方默认代理策略")
 
     def _on_detail_action(self, app_id: str, action: str) -> None:
         spec = spec_by_id(app_id)

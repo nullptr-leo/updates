@@ -88,11 +88,14 @@ class Context:
 
     def get(self, url: str, **kwargs: Any) -> str:
         self.token.raise_if_cancelled()
-        return services.http_get(url, settings=self.settings, **kwargs)
+        kwargs.setdefault("settings", self.settings)
+        kwargs.setdefault("spec", self.spec)
+        return services.http_get(url, **kwargs)
 
     def redirected(self, url: str) -> str:
         self.token.raise_if_cancelled()
-        return services.get_redirected_url(url, settings=self.settings)
+        return services.get_redirected_url(
+            url, settings=self.settings, spec=self.spec)
 
     def rendered(self, url: str) -> str:
         self.token.raise_if_cancelled()
@@ -165,14 +168,15 @@ class UpdateEngine:
             result = self._hook("remote", remote.custom)(ctx)
             return result if isinstance(result, RemoteInfo) else RemoteInfo(version=str(result))
         if remote.kind == "redirect":
-            final = services.get_redirected_url(remote.url, settings=self.settings)
+            final = services.get_redirected_url(
+                remote.url, settings=self.settings, spec=spec)
             return RemoteInfo(version=self._extract_version(remote, final),
                               url=final, text=final)
         if remote.kind == "headless":
             text = services.query_rendered(remote.url)
         else:
             text = services.http_get(
-                remote.url, settings=self.settings,
+                remote.url, settings=self.settings, spec=spec,
                 headers=dict(remote.headers or {}),
             )
         if remote.kind == "findall_max":
@@ -240,7 +244,7 @@ class UpdateEngine:
             self._send(spec, Phase.DOWNLOADING, message=text,
                        current=current, total=total)
 
-        services.download_file(url, dest, settings=self.settings,
+        services.download_file(url, dest, settings=self.settings, spec=spec,
                                token=token, on_progress=progress)
 
     @staticmethod
