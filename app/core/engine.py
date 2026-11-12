@@ -11,6 +11,7 @@ import os
 import re
 import shlex
 import shutil
+import time
 import traceback
 from typing import Any, Callable, Mapping
 
@@ -260,11 +261,20 @@ class UpdateEngine:
                 return found[0]
         return root
 
+    @staticmethod
+    def _close_running(spec: AppSpec) -> None:
+        """Close the app before overwriting its files (post-install kill is too late)."""
+        for action in spec.post:
+            head, _, value = action.partition(":")
+            if head == "taskkill" and value:
+                services.kill_process(value)
+
     def _install(self, spec: AppSpec, dest: str, info: RemoteInfo,
                  ctx: Context, token: CancellationToken) -> None:
         inst: InstallSpec | None = spec.install
         if inst is None or inst.kind == "manual":
             return
+        self._close_running(spec)
         if inst.kind == "custom":
             self._hook("install", inst.custom)(ctx, info, dest)
             return
@@ -288,7 +298,16 @@ class UpdateEngine:
             return
         if inst.kind == "copy":
             target_dir = ctx.install_dir(create=True)
-            shutil.copy2(dest, os.path.join(target_dir, inst.subdir))
+            target = os.path.join(target_dir, inst.subdir)
+            for attempt in range(3):
+                try:
+                    shutil.copy2(dest, target)
+                    return
+                except PermissionError:
+                    if attempt == 2:
+                        raise
+                    services.kill_process(os.path.basename(target))
+                    time.sleep(0.5)
             return
         if inst.kind == "extract":
             target_dir = ctx.install_dir(create=True)
