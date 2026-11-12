@@ -507,6 +507,18 @@ def _clear_extracted(dest: str) -> None:
                 pass
 
 
+def _unrar_rarfile():
+    """Import unrar.rarfile after pointing it at the bundled UnRAR DLL.
+
+    unrarlib reads UNRAR_LIB_PATH at import time, so the variable must be set
+    before the module is loaded; setdefault() would also keep a stale value.
+    """
+    if UNRAR_DLL.is_file():
+        os.environ["UNRAR_LIB_PATH"] = str(UNRAR_DLL)
+    from unrar import rarfile
+    return rarfile
+
+
 def list_archive(path: str) -> list[str]:
     lower = path.lower()
     if lower.endswith(".zip"):
@@ -528,13 +540,12 @@ def list_archive(path: str) -> list[str]:
                 ) from exc
     if lower.endswith(".rar"):
         try:
-            import unrar  # noqa: F401
-            from unrar import rarfile
-            os.environ.setdefault("UNRAR_LIB_PATH", str(UNRAR_DLL))
-            with rarfile.RarFile(path) as rf:
+            with _unrar_rarfile().RarFile(path) as rf:
                 return rf.namelist()
         except ImportError as exc:
             raise QueryFailed("需要 unrar 才能读取 .rar 压缩包") from exc
+        except (LookupError, OSError):
+            return _winrar_list(path, None)
     raise QueryFailed(f"不支持的压缩包: {path}")
 
 
@@ -571,12 +582,10 @@ def extract_archive(path: str, dest: str, *, settings: Settings | None = None) -
         return
     if lower.endswith(".rar"):
         try:
-            from unrar import rarfile
-            os.environ.setdefault("UNRAR_LIB_PATH", str(UNRAR_DLL))
-            with rarfile.RarFile(path) as rf:
+            with _unrar_rarfile().RarFile(path) as rf:
                 rf.extractall(dest)
             return
-        except ImportError:
+        except (ImportError, LookupError, OSError):
             _winrar_extract(path, dest, settings)
             return
     _winrar_extract(path, dest, settings)
