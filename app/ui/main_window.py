@@ -382,7 +382,7 @@ class MainWindow(QMainWindow):
         value = self.model.data(self.model.index(source.row(), C_NAME),
                                 Qt.ItemDataRole.UserRole)
         if isinstance(value, AppSpec):
-            self._start(Mode.CHECK, [value])
+            self._start(Mode.UPDATE, [value])
 
     def _show_context_menu(self, pos) -> None:
         if not self.table.indexAt(pos).isValid():
@@ -391,7 +391,7 @@ class MainWindow(QMainWindow):
         if not specs:
             return
         menu = QMenu(self)
-        for label, mode in (("检查更新", Mode.CHECK), ("更新", Mode.UPDATE),
+        for label, mode in (("检查更新", Mode.UPDATE), ("检查远程版本", Mode.CHECK),
                             ("强制更新", Mode.FORCE), ("仅下载安装包", Mode.DOWNLOAD_ONLY)):
             action = menu.addAction(label)
             action.triggered.connect(
