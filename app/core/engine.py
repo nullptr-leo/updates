@@ -518,6 +518,7 @@ class UpdateEngine:
                 self._send(spec, Phase.DONE, message="更新完成",
                            local_version=local, remote_version=remote,
                            needs_update=False, finished=True)
+                return
             except Cancelled as exc:
                 self._finish_error(spec, Phase.CANCELLED, exc, local, remote)
                 return
