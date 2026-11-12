@@ -11,11 +11,11 @@ import os
 import re
 import shlex
 import shutil
-import tempfile
 import traceback
 from typing import Any, Callable, Mapping
 
 from . import cache, services
+from .atomic_io import temporary_workspace
 from .cancellation import CancellationToken
 from .config import Settings, download_dir
 from .logging_setup import get_logger
@@ -288,7 +288,7 @@ class UpdateEngine:
             return
         if inst.kind == "extract":
             target_dir = ctx.install_dir(create=True)
-            with tempfile.TemporaryDirectory(prefix="us-extract-") as tmp:
+            with temporary_workspace(prefix="us-extract-") as tmp:
                 services.extract_archive(dest, tmp, settings=self.settings)
                 source = self._extract_source(tmp, inst)
                 if inst.mode == "rmtree_first":
@@ -466,7 +466,7 @@ class UpdateEngine:
                 self._send(spec, Phase.DOWNLOADING,
                            local_version=local, remote_version=remote,
                            needs_update=True)
-                with tempfile.TemporaryDirectory(prefix="us-") as tmp:
+                with temporary_workspace(prefix="us-") as tmp:
                     ext = self._extension(url, spec)
                     dest = os.path.join(tmp, f"{spec.id}{ext}")
                     self._download(url, dest, spec, token)

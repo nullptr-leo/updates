@@ -840,7 +840,88 @@ class DownloadStatusTests(unittest.TestCase):
         model.apply_event(ProgressEvent(app_id="demo", phase=Phase.DOWNLOADING,
                                         message="1.0M / 2.0M", current=1,
                                         total=2))
-        self.assertEqual(model.row_at(0).status_text, "下载中 1.0M / 2.0M")
+        self.assertEqual(model.row_at(0).status_text, "下载中 (1.0M / 2.0M)")
+
+
+class TempCleanupTests(unittest.TestCase):
+    def test_transient_lock_is_retried(self):
+        import os
+        import shutil
+        import tempfile
+        from app.core import atomic_io
+
+        path = tempfile.mkdtemp(prefix="us-test-")
+        with open(os.path.join(path, "vlc.7z"), "wb") as fh:
+            fh.write(b"x")
+        real_rmtree = shutil.rmtree
+        calls = []
+
+        def flaky(target, *args, **kwargs):
+            calls.append(target)
+            if len(calls) < 3:
+                raise PermissionError(32, "另一个程序正在使用此文件")
+            return real_rmtree(target, *args, **kwargs)
+
+        with patch.object(shutil, "rmtree", side_effect=flaky), \
+             patch.object(atomic_io, "_CLEANUP_BACKOFF", 0):
+            self.assertTrue(atomic_io.rmtree_with_retry(path))
+        self.assertEqual(len(calls), 3)
+        self.assertFalse(os.path.exists(path))
+
+    def test_cleanup_error_does_not_mask_body_error(self):
+        import shutil
+        from app.core import atomic_io
+
+        real_rmtree = shutil.rmtree
+        created = []
+
+        def always_locked(path, *args, **kwargs):
+            created.append(path)
+            raise PermissionError(32, "locked")
+
+        with patch.object(shutil, "rmtree", side_effect=always_locked), \
+             patch.object(atomic_io, "_CLEANUP_ATTEMPTS", 1):
+            with self.assertRaisesRegex(ValueError, "original"):
+                with atomic_io.temporary_workspace(prefix="us-test-"):
+                    raise ValueError("original")
+        for path in created:
+            real_rmtree(path, ignore_errors=True)
+
+    def test_locked_cleanup_does_not_fail_an_update(self):
+        import shutil
+        from app.core import atomic_io, cache
+
+        spec = AppSpec(
+            id="demo", name="Demo", homepage="",
+            local=LocalSpec(kind="exe", target="demo.exe"),
+            remote=RemoteSpec(url="https://example.com", kind="regex",
+                              pattern=r"v([\d.]+)"),
+            download=DownloadSpec(url="https://example.com/demo.exe"),
+            install=InstallSpec(kind="installer"),
+        )
+        real_rmtree = shutil.rmtree
+        created = []
+
+        def always_locked(path, *args, **kwargs):
+            created.append(path)
+            raise PermissionError(32, "locked")
+
+        events = []
+        engine = UpdateEngine(Settings(), events.append, hooks=HOOKS)
+        with patch.object(services, "network_status",
+                          return_value=(True, "网络已连接")), \
+             patch.object(services, "get_local_version", return_value="1.0.0"), \
+             patch.object(services, "http_get", return_value="v1.2.3"), \
+             patch.object(engine, "_download"), \
+             patch.object(engine, "_install"), \
+             patch.object(engine, "_post"), \
+             patch.object(cache, "record_update_time"), \
+             patch.object(shutil, "rmtree", side_effect=always_locked), \
+             patch.object(atomic_io, "_CLEANUP_ATTEMPTS", 1):
+            engine.run(spec, Mode.UPDATE, CancellationToken())
+        for path in created:
+            real_rmtree(path, ignore_errors=True)
+        self.assertEqual(events[-1].phase, Phase.DONE)
 
 
 if __name__ == "__main__":

@@ -51,7 +51,7 @@ class AppRow:
         if self.needs_update and self.phase in (Phase.IDLE, Phase.DONE):
             return "可更新"
         if self.phase == Phase.DOWNLOADING and self.message:
-            return f"下载中 {self.message}"
+            return f"下载中 ({self.message})"
         return self.phase.value
 
     @property

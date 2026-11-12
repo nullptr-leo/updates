@@ -17,6 +17,7 @@ import sys
 import tempfile
 import time
 import zipfile
+from contextlib import closing
 from typing import Callable, Iterable, Sequence
 
 import requests
@@ -267,28 +268,28 @@ def download_file(
     if not url:
         raise QueryFailed("下载地址为空")
     try:
-        response = requests.get(
+        with closing(requests.get(
             url,
             headers={**DEFAULT_HEADERS, **(headers or {})},
             proxies=_proxies(settings),
             verify=_verify(settings),
             stream=True,
             timeout=(30, 120),
-        )
-        response.raise_for_status()
-        total = int(response.headers.get("Content-Length") or 0)
-        current = 0
-        os.makedirs(os.path.dirname(dest), exist_ok=True)
-        with open(dest, "wb") as fh:
-            for chunk in response.iter_content(chunk_size=64 * 1024):
-                if token is not None:
-                    token.raise_if_cancelled()
-                if not chunk:
-                    continue
-                fh.write(chunk)
-                current += len(chunk)
-                if on_progress:
-                    on_progress(current, total)
+        )) as response:
+            response.raise_for_status()
+            total = int(response.headers.get("Content-Length") or 0)
+            current = 0
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            with open(dest, "wb") as fh:
+                for chunk in response.iter_content(chunk_size=64 * 1024):
+                    if token is not None:
+                        token.raise_if_cancelled()
+                    if not chunk:
+                        continue
+                    fh.write(chunk)
+                    current += len(chunk)
+                    if on_progress:
+                        on_progress(current, total)
         if on_progress:
             on_progress(current, total or current)
     except (Cancelled, TimedOut):
