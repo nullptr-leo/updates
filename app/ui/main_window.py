@@ -351,7 +351,6 @@ class MainWindow(QMainWindow):
         self._set_busy(False)
         self.activity.append_line(f"本轮任务结束（{self._done}/{self._total}）")
         self.statusBar().showMessage("任务结束")
-        self.tray.notify("Update Scripts", "本轮任务已结束")
         self._update_activity()
 
     def _on_selection(self, current, previous) -> None:

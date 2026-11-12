@@ -802,6 +802,12 @@ class ScheduledAutoUpdateTests(unittest.TestCase):
             self.window._scheduled_cycle()
         self.assertEqual(self.submitted, [])
 
+    def test_task_end_does_not_show_tray_notification(self):
+        with patch.object(self.window.tray, "notify") as notify:
+            self.window._on_idle()
+        notify.assert_not_called()
+        self.assertEqual(self.window.statusBar().currentMessage(), "任务结束")
+
     def test_timer_uses_configured_interval(self):
         self.assertTrue(self.window._scheduler.isActive())
         self.assertEqual(self.window._scheduler.interval(),
