@@ -773,6 +773,14 @@ class ScheduledAutoUpdateTests(unittest.TestCase):
         self.window._on_idle()
         self.assertEqual([m for m, _ in self.submitted], [Mode.CHECK])
 
+    def test_uptodate_result_does_not_trigger_install(self):
+        self.window._scheduled_cycle()
+        self.window._on_event(self.ProgressEvent(
+            app_id="normal", phase=Phase.UPTODATE, needs_update=False,
+            local_version="1.0", remote_version="1.0", finished=True))
+        self.window._on_idle()
+        self.assertEqual([m for m, _ in self.submitted], [Mode.CHECK])
+
     def test_switch_off_keeps_check_only(self):
         self.window.settings.auto_install_updates = False
         self.window._scheduled_cycle()
@@ -922,6 +930,54 @@ class TempCleanupTests(unittest.TestCase):
         for path in created:
             real_rmtree(path, ignore_errors=True)
         self.assertEqual(events[-1].phase, Phase.DONE)
+
+
+class UptodateCheckTests(unittest.TestCase):
+    @staticmethod
+    def _check(local: str, remote: str):
+        spec = AppSpec(
+            id="demo", name="Demo", homepage="",
+            local=LocalSpec(kind="exe", target="demo.exe"),
+            remote=RemoteSpec(url="https://example.com", kind="regex",
+                              pattern=r"v([\d.]+)"),
+            install=InstallSpec(kind="installer"),
+        )
+        events = []
+        engine = UpdateEngine(Settings(), events.append, hooks=HOOKS)
+        with patch.object(services, "network_status",
+                          return_value=(True, "网络已连接")), \
+             patch.object(services, "get_local_version", return_value=local), \
+             patch.object(services, "http_get", return_value=remote):
+            engine.run(spec, Mode.CHECK, CancellationToken())
+        return spec, events
+
+    @staticmethod
+    def _row(spec, events):
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+        from app.ui.table_model import AppTableModel
+        app = QApplication.instance() or QApplication([])
+        model = AppTableModel([spec], parent=app)
+        for ev in events:
+            model.apply_event(ev)
+        return model.row_at(0)
+
+    def test_check_without_update_is_uptodate(self):
+        from app.core.models import LogLevel
+        spec, events = self._check("2.0.0", "v2.0.0")
+        final = events[-1]
+        self.assertEqual(final.phase, Phase.UPTODATE)
+        self.assertFalse(final.needs_update)
+        self.assertEqual(final.effective_level, LogLevel.INFO)
+        row = self._row(spec, events)
+        self.assertEqual(row.status_text, "已是最新")
+        self.assertEqual(row.status_kind, "success")
+
+    def test_check_with_update_still_reports_updatable(self):
+        spec, events = self._check("1.0.0", "v2.0.0")
+        self.assertEqual(events[-1].phase, Phase.DONE)
+        self.assertEqual(self._row(spec, events).status_text, "可更新")
 
 
 if __name__ == "__main__":

@@ -20,8 +20,8 @@ from .cancellation import CancellationToken
 from .config import Settings, download_dir
 from .logging_setup import get_logger
 from .models import (
-    AppSpec, Cancelled, ErrorInfo, InstallSpec, Mode, NotInstalled, Phase,
-    ProgressEvent, QueryFailed, RemoteInfo, RemoteSpec,
+    AppSpec, Cancelled, ErrorInfo, InstallSpec, LogLevel, Mode, NotInstalled,
+    Phase, ProgressEvent, QueryFailed, RemoteInfo, RemoteSpec,
 )
 from .ports import ProcessPort, SubprocessPort
 
@@ -442,10 +442,17 @@ class UpdateEngine:
                               spec.id, local, remote, needs)
 
                 if mode == Mode.CHECK:
-                    self._send(spec, Phase.SKIPPED if not_installed else Phase.DONE,
-                               message="未安装" if not_installed else "检查完成",
+                    if not_installed:
+                        phase, message = Phase.SKIPPED, "未安装"
+                    elif needs:
+                        phase, message = Phase.DONE, "检查完成"
+                    else:
+                        phase, message = Phase.UPTODATE, ""
+                    self._send(spec, phase, message=message,
                                local_version=local, remote_version=remote,
-                               needs_update=needs, finished=True)
+                               needs_update=needs, finished=True,
+                               level=(LogLevel.INFO if phase == Phase.UPTODATE
+                                      else None))
                     return
                 if not needs:
                     self._send(spec, Phase.UPTODATE, local_version=local,
