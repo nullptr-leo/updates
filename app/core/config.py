@@ -80,6 +80,7 @@ class Settings:
     schedule_enabled: bool = False
     schedule_minutes: int = 60
     run_on_start: bool = False
+    auto_install_updates: bool = True
     concurrency: int = 4
     timeout_seconds: int = 600
     download_dir: str = ""
@@ -102,8 +103,13 @@ class Settings:
         # v1 keys -> v2
         if "ignored_program" in raw and "ignored" not in raw:
             cfg.ignored = list(raw.get("ignored_program") or [])
-        if "auto_update" in raw and "schedule_enabled" not in raw:
-            cfg.schedule_enabled = bool(raw.get("auto_update"))
+        # v1's auto_update meant "update automatically", so it must map to
+        # both the schedule switch and the unattended install switch.
+        if "auto_update" in raw:
+            if "schedule_enabled" not in raw:
+                cfg.schedule_enabled = bool(raw.get("auto_update"))
+            if "auto_install_updates" not in raw:
+                cfg.auto_install_updates = bool(raw.get("auto_update"))
         cfg.schema = 2
         cfg.concurrency = max(1, min(16, int(cfg.concurrency)))
         cfg.schedule_minutes = max(5, int(cfg.schedule_minutes))

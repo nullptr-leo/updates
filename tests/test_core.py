@@ -451,7 +451,7 @@ class LocalizationTests(unittest.TestCase):
         import os
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         from PySide6.QtWidgets import QApplication
-        from app.core.config import load_settings
+        from app.core.config import Settings
         from app.ui.main_window import MainWindow
         from app.ui.tray import Tray
         QApplication.instance() or QApplication([])
@@ -461,7 +461,7 @@ class LocalizationTests(unittest.TestCase):
         self.assertIn("升级软件", tray_texts)
         self.assertFalse(any("git" in t.lower() for t in tray_texts))
 
-        window = MainWindow(load_settings(), "版本 2.0")
+        window = MainWindow(Settings(), "版本 2.0")
         more_texts = [a.text() for a in window.more_btn.menu().actions()]
         self.assertIn("升级软件", more_texts)
         self.assertFalse(any("git" in t.lower() for t in more_texts))
@@ -615,6 +615,187 @@ class RemoteParsingTests(unittest.TestCase):
         value = UpdateEngine._extract_version(
             remote, "<div>view version</div> Release V1.86 available")
         self.assertEqual(value, "1.86")
+
+
+class AutoUpdateSettingsTests(unittest.TestCase):
+    def test_auto_install_defaults_to_enabled(self):
+        self.assertTrue(Settings().auto_install_updates)
+        self.assertTrue(Settings.from_dict(
+            {"schedule_enabled": True}).auto_install_updates)
+
+    def test_legacy_auto_update_enables_schedule_and_install(self):
+        enabled = Settings.from_dict({"auto_update": True})
+        self.assertTrue(enabled.schedule_enabled)
+        self.assertTrue(enabled.auto_install_updates)
+        disabled = Settings.from_dict({"auto_update": False})
+        self.assertFalse(disabled.schedule_enabled)
+        self.assertFalse(disabled.auto_install_updates)
+
+    def test_explicit_v2_keys_win_over_legacy_auto_update(self):
+        cfg = Settings.from_dict({"auto_update": True,
+                                  "schedule_enabled": False,
+                                  "auto_install_updates": False})
+        self.assertFalse(cfg.schedule_enabled)
+        self.assertFalse(cfg.auto_install_updates)
+
+    def test_settings_dialog_persists_auto_install_switch(self):
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+        from app.ui.widgets import SettingsDialog
+        QApplication.instance() or QApplication([])
+        dialog = SettingsDialog(Settings(auto_install_updates=True))
+        self.assertTrue(dialog.auto_install.isChecked())
+        dialog.auto_install.setChecked(False)
+        dialog.accept()
+        self.assertFalse(dialog.values().auto_install_updates)
+
+
+class AutoInstallableTests(unittest.TestCase):
+    @staticmethod
+    def _spec(**kwargs):
+        values = dict(
+            id="demo", name="Demo",
+            local=LocalSpec(kind="exe", target="demo.exe"),
+            download=DownloadSpec(url="https://example.com/demo.exe"),
+            install=InstallSpec(kind="installer"),
+        )
+        values.update(kwargs)
+        return AppSpec(**values)
+
+    def test_normal_app_is_auto_installable(self):
+        self.assertTrue(self._spec().auto_installable)
+
+    def test_manual_missing_local_or_download_is_excluded(self):
+        for spec in (self._spec(manual_only=True),
+                     self._spec(install=InstallSpec(kind="manual")),
+                     self._spec(local=None),
+                     self._spec(download=None)):
+            self.assertFalse(spec.auto_installable)
+
+    def test_catalog_only_excludes_apps_without_a_download(self):
+        excluded = [s for s in all_specs() if not s.auto_installable]
+        self.assertTrue(excluded)
+        self.assertTrue(all(not s.downloadable for s in excluded))
+
+
+class NotInstalledCheckTests(unittest.TestCase):
+    def test_check_never_marks_missing_app_as_updatable(self):
+        from app.core.models import NotInstalled
+        spec = AppSpec(
+            id="demo", name="Demo",
+            local=LocalSpec(kind="exe", target="demo.exe"),
+            remote=RemoteSpec(url="https://example.com/v", kind="regex",
+                              pattern=r"v([\d.]+)"),
+            download=DownloadSpec(url="https://example.com/demo.exe"),
+            install=InstallSpec(kind="installer"),
+        )
+        events = []
+        engine = UpdateEngine(Settings(), events.append, hooks=HOOKS)
+        with patch.object(services, "network_status",
+                          return_value=(True, "网络已连接")), \
+             patch.object(services, "get_local_version",
+                          side_effect=NotInstalled("未安装")), \
+             patch.object(services, "http_get", return_value="v1.2.3"), \
+             patch.object(services, "download_file",
+                          side_effect=AssertionError("must not download")):
+            engine.run(spec, Mode.CHECK, CancellationToken())
+        final = events[-1]
+        self.assertEqual(final.phase, Phase.SKIPPED)
+        self.assertFalse(final.needs_update)
+        self.assertNotIn(Phase.DOWNLOADING, [e.phase for e in events])
+
+
+class ScheduledAutoUpdateTests(unittest.TestCase):
+    def setUp(self):
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+        from app.core.models import ProgressEvent
+        from app.ui.main_window import MainWindow
+        QApplication.instance() or QApplication([])
+        self.ProgressEvent = ProgressEvent
+        specs = [
+            AppSpec(id="normal", name="Normal",
+                    local=LocalSpec(kind="exe", target="n.exe"),
+                    download=DownloadSpec(url="https://example.com/n.exe"),
+                    install=InstallSpec(kind="installer")),
+            AppSpec(id="manual", name="Manual", manual_only=True,
+                    local=LocalSpec(kind="exe", target="m.exe"),
+                    install=InstallSpec(kind="manual")),
+            AppSpec(id="stale", name="Stale",
+                    local=LocalSpec(kind="exe", target="s.exe"),
+                    download=DownloadSpec(url="https://example.com/s.exe"),
+                    install=InstallSpec(kind="installer")),
+        ]
+        settings = Settings(schedule_enabled=True, auto_install_updates=True,
+                            run_on_start=False)
+        with patch("app.ui.main_window.visible_specs", return_value=specs), \
+             patch("app.ui.main_window.cache.load_cache", return_value={}):
+            self.window = MainWindow(settings, "版本 2.0")
+        self.submitted = []
+        patcher = patch.object(
+            self.window.pool, "submit",
+            side_effect=lambda targets, mode: (
+                self.submitted.append((mode, [s.id for s in targets]))
+                or len(targets)))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _done(self, app_id, **kwargs):
+        values = dict(app_id=app_id, phase=Phase.DONE, message="检查完成",
+                      local_version="1.0", remote_version="2.0",
+                      needs_update=True, finished=True)
+        values.update(kwargs)
+        self.window._on_event(self.ProgressEvent(**values))
+
+    def test_sweep_checks_then_installs_without_prompt(self):
+        with patch("app.ui.main_window.QMessageBox") as box:
+            self.window._scheduled_cycle()
+            self._done("normal")
+            self._done("manual")
+            self.window._on_idle()
+            box.question.assert_not_called()
+        self.assertEqual(len(self.submitted), 2)
+        check_mode, check_ids = self.submitted[0]
+        self.assertEqual(check_mode, Mode.CHECK)
+        self.assertEqual(set(check_ids), {"normal", "manual", "stale"})
+        install_mode, install_ids = self.submitted[1]
+        self.assertEqual(install_mode, Mode.UPDATE)
+        self.assertEqual(install_ids, ["normal"])
+
+    def test_failed_result_and_stale_cache_never_install(self):
+        self.window._scheduled_cycle()
+        self.window._on_event(self.ProgressEvent(
+            app_id="normal", phase=Phase.FAILED, message="网络错误",
+            local_version="1.0", needs_update=True, finished=True))
+        self.window.model.row_at(0).needs_update = True
+        self.window._on_idle()
+        self.assertEqual([m for m, _ in self.submitted], [Mode.CHECK])
+
+    def test_switch_off_keeps_check_only(self):
+        self.window.settings.auto_install_updates = False
+        self.window._scheduled_cycle()
+        self._done("normal")
+        self.window._on_idle()
+        self.assertEqual([m for m, _ in self.submitted], [Mode.CHECK])
+
+    def test_stop_cancels_pending_install(self):
+        self.window._scheduled_cycle()
+        self._done("normal")
+        self.window._stop()
+        self.window._on_idle()
+        self.assertEqual([m for m, _ in self.submitted], [Mode.CHECK])
+
+    def test_overlapping_sweep_is_skipped(self):
+        with patch.object(self.window.pool, "active_count", return_value=1):
+            self.window._scheduled_cycle()
+        self.assertEqual(self.submitted, [])
+
+    def test_timer_uses_configured_interval(self):
+        self.assertTrue(self.window._scheduler.isActive())
+        self.assertEqual(self.window._scheduler.interval(),
+                         self.window.settings.schedule_minutes * 60 * 1000)
 
 
 if __name__ == "__main__":

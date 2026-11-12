@@ -401,6 +401,7 @@ class UpdateEngine:
         for attempt in range(NETWORK_ATTEMPTS):
             local = remote = ""
             needs: bool | None = None
+            not_installed = False
             try:
                 self._await_network(spec, token, hold=retry_after_outage)
                 retry_after_outage = False
@@ -412,6 +413,7 @@ class UpdateEngine:
                     if mode != Mode.CHECK:
                         raise
                     local = ""
+                    not_installed = True
                 # Do not publish the plain version here: the remote resolver
                 # supplies the build date, and sending a bare "3.0.25" would
                 # overwrite the date-decorated label already in the table.
@@ -423,6 +425,11 @@ class UpdateEngine:
                                           lexicographic=spec.lexicographic)
                 if mode.is_force or info.extra.get("force_update"):
                     needs = True
+                # An app that is not installed must never be reported as
+                # updatable: is_newer(remote, "") would otherwise return True
+                # and an unattended sweep could install it from scratch.
+                if not_installed:
+                    needs = False
                 # Build dates are display-only; version comparison, download
                 # URLs and package names keep using the plain version string.
                 local = _version_label(local, info.extra.get("local_date"))
@@ -435,7 +442,8 @@ class UpdateEngine:
                               spec.id, local, remote, needs)
 
                 if mode == Mode.CHECK:
-                    self._send(spec, Phase.DONE, message="检查完成",
+                    self._send(spec, Phase.SKIPPED if not_installed else Phase.DONE,
+                               message="未安装" if not_installed else "检查完成",
                                local_version=local, remote_version=remote,
                                needs_update=needs, finished=True)
                     return

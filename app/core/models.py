@@ -200,6 +200,13 @@ class AppSpec:
     def downloadable(self) -> bool:
         return self.download is not None and not self.manual_only
 
+    @property
+    def auto_installable(self) -> bool:
+        """Whether an unattended sweep may install this app without a prompt."""
+        return (self.local is not None
+                and self.downloadable
+                and (self.install is None or self.install.kind != "manual"))
+
 
 @dataclass(frozen=True)
 class ErrorInfo:

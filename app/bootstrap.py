@@ -55,7 +55,7 @@ def run_cli(argv: list[str]) -> int:
 
     settings = load_settings()
     if len(argv) < 2:
-        print("用法: python main.pyw --cli check|update|force [app-id ...]")
+        print("用法: python main.pyw --cli check|update|force|download_only [app-id ...]")
         return 2
     try:
         mode = Mode(argv[1].lower())

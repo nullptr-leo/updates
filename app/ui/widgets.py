@@ -391,11 +391,18 @@ class SettingsDialog(QDialog):
         self.verify.setChecked(settings.verify_tls)
         self.schedule = QCheckBox("启用定时检查")
         self.schedule.setChecked(settings.schedule_enabled)
+        self.auto_install = QCheckBox("检查到更新后自动安装")
+        self.auto_install.setToolTip(
+            "定时巡检与启动巡检均适用：发现更新后自动下载并安装，"
+            "必要时自动关闭相关程序。\n"
+            "需手动更新或未安装的软件会被跳过；个别无静默参数的"
+            "安装器仍可能弹出安装界面，需要人工确认。")
+        self.auto_install.setChecked(settings.auto_install_updates)
         self.minutes = QSpinBox()
         self.minutes.setRange(5, 1440)
         self.minutes.setSuffix(" 分钟")
         self.minutes.setValue(settings.schedule_minutes)
-        self.run_on_start = QCheckBox("启动时检查一次")
+        self.run_on_start = QCheckBox("启动时立即巡检一次")
         self.run_on_start.setChecked(settings.run_on_start)
         self.tray = QCheckBox("关闭窗口时最小化到托盘")
         self.tray.setChecked(settings.minimize_to_tray)
@@ -409,7 +416,8 @@ class SettingsDialog(QDialog):
         form.addRow("", self.verify)
         form.addRow("仅下载保存目录", self.download_dir)
         form.addRow("", self.schedule)
-        form.addRow("检查间隔", self.minutes)
+        form.addRow("", self.auto_install)
+        form.addRow("巡检间隔", self.minutes)
         form.addRow("", self.run_on_start)
         form.addRow("", self.tray)
 
@@ -435,6 +443,7 @@ class SettingsDialog(QDialog):
             verify_tls=self.verify.isChecked(),
             schedule_enabled=self.schedule.isChecked(),
             schedule_minutes=self.minutes.value(),
+            auto_install_updates=self.auto_install.isChecked(),
             run_on_start=self.run_on_start.isChecked(),
             minimize_to_tray=self.tray.isChecked(),
             download_dir=self.download_dir.text().strip(),

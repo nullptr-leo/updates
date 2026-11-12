@@ -83,6 +83,8 @@ class MainWindow(QMainWindow):
         self._force_quit = False
         self._done = 0
         self._total = 0
+        self._auto_cycle = False
+        self._auto_update_ids: set[str] = set()
         self._async = _AsyncSignals()
         self._async.archiveDone.connect(self._on_archive_done)
         self._async.selfUpdateDone.connect(self._on_self_update_done)
@@ -113,7 +115,7 @@ class MainWindow(QMainWindow):
         self.activity.append_line(f"已加载 {self.model.rowCount()} 个软件")
 
         if settings.run_on_start or settings.schedule_enabled:
-            QTimer.singleShot(900, lambda: self._start(Mode.CHECK, all_visible=True))
+            QTimer.singleShot(900, self._scheduled_cycle)
 
     # ------------------------------------------------------------------ UI
     def _build_ui(self) -> None:
@@ -257,30 +259,35 @@ class MainWindow(QMainWindow):
         return []
 
     def _start(self, mode: Mode, specs: list[AppSpec] | None = None,
-               all_visible: bool = False) -> None:
+               all_visible: bool = False, *, auto: bool = False) -> bool:
+        if not auto:
+            self._cancel_auto_cycle()
         targets = [s for s in self._specs_for(mode, specs, all_visible)
                    if not self.pool.is_active(s.id)]
         if not targets:
-            return
-        if mode in (Mode.UPDATE, Mode.FORCE) and len(targets) > 1:
+            return False
+        # An unattended sweep must never open a modal confirmation dialog.
+        if not auto and mode in (Mode.UPDATE, Mode.FORCE) and len(targets) > 1:
             answer = QMessageBox.question(
                 self, "确认更新",
                 f"即将更新 {len(targets)} 个软件，期间会自动关闭相关程序并完成安装。\n是否继续？",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if answer != QMessageBox.StandardButton.Yes:
-                return
+                return False
         self.model.reset_phases([s.id for s in targets])
         self._total = len(targets)
         self._done = 0
         self._set_busy(True)
         self.activity.append_line(
-            f"开始「{mode.label}」，共 {len(targets)} 个软件："
+            ("自动巡检：" if auto else "")
+            + f"开始「{mode.label}」，共 {len(targets)} 个软件："
             + ", ".join(s.id for s in targets[:8])
             + ("…" if len(targets) > 8 else "")
         )
         self.pool.submit(targets, mode)
         self._update_activity()
+        return True
 
     def _confirm_update_all(self) -> None:
         updatable = [self.model.row_at(i).spec
@@ -293,6 +300,7 @@ class MainWindow(QMainWindow):
         self._start(Mode.UPDATE, updatable)
 
     def _stop(self) -> None:
+        self._cancel_auto_cycle()
         self.pool.cancel_all()
         self.activity.append_line("已发送停止请求")
 
@@ -303,6 +311,11 @@ class MainWindow(QMainWindow):
 
     # --------------------------------------------------------------- events
     def _on_event(self, ev: ProgressEvent) -> None:
+        # Only apps freshly confirmed updatable by this sweep may be installed;
+        # a stale cache entry or a failed check must never trigger an install.
+        if (self._auto_cycle and ev.phase == Phase.DONE
+                and ev.needs_update and ev.local_version and not ev.error):
+            self._auto_update_ids.add(ev.app_id)
         self.model.apply_event(ev)
         self.activity.append_event(ev)
         index = self.model.index_of(ev.app_id)
@@ -319,6 +332,22 @@ class MainWindow(QMainWindow):
         self._update_activity()
 
     def _on_idle(self) -> None:
+        if self._auto_cycle:
+            self._auto_cycle = False
+            ids = set(self._auto_update_ids)
+            self._auto_update_ids.clear()
+            targets = self._auto_install_targets(ids)
+            skipped = sorted(ids - {s.id for s in targets})
+            if (self.settings.schedule_enabled
+                    and self.settings.auto_install_updates):
+                if skipped:
+                    self.activity.append_line(
+                        "需手动更新或无法自动安装，已跳过：" + ", ".join(skipped))
+                if targets:
+                    self.activity.append_line(
+                        f"检查到 {len(targets)} 个更新，开始自动安装")
+                    if self._start(Mode.UPDATE, targets, auto=True):
+                        return
         self._set_busy(False)
         self.activity.append_line(f"本轮任务结束（{self._done}/{self._total}）")
         self.statusBar().showMessage("任务结束")
@@ -459,7 +488,8 @@ class MainWindow(QMainWindow):
             self, "关于 Update Scripts",
             "Update Scripts 2.0\n\n"
             "集中检查并升级常用软件。\n"
-            "支持定时检查、忽略不需要的软件；关闭窗口后可继续在托盘运行。",
+            "支持定时巡检（发现更新可自动安装）、忽略不需要的软件；"
+            "关闭窗口后可继续在托盘运行。",
         )
 
     def _apply_filter(self) -> None:
@@ -512,11 +542,36 @@ class MainWindow(QMainWindow):
         self.pool.wait_for_done(1500)
         QApplication.instance().quit()
 
+    def _scheduled_cycle(self) -> None:
+        """One scheduled/startup sweep: check, then install confirmed updates."""
+        if self.pool.active_count():
+            self.activity.append_line("上一轮巡检尚未结束，跳过本次定时任务")
+            return
+        if not (self.settings.schedule_enabled
+                and self.settings.auto_install_updates):
+            self._start(Mode.CHECK, all_visible=True, auto=True)
+            return
+        self._auto_cycle = True
+        self._auto_update_ids.clear()
+        if not self._start(Mode.CHECK, all_visible=True, auto=True):
+            self._auto_cycle = False
+
+    def _cancel_auto_cycle(self) -> None:
+        self._auto_cycle = False
+        self._auto_update_ids.clear()
+
+    def _auto_install_targets(self, ids: set[str]) -> list[AppSpec]:
+        targets = []
+        for i in range(self.model.rowCount()):
+            spec = self.model.row_at(i).spec
+            if spec.id in ids and spec.auto_installable:
+                targets.append(spec)
+        return targets
+
     def _apply_schedule(self) -> None:
         if not hasattr(self, "_scheduler"):
             self._scheduler = QTimer(self)
-            self._scheduler.timeout.connect(
-                lambda: self._start(Mode.CHECK, all_visible=True))
+            self._scheduler.timeout.connect(self._scheduled_cycle)
         if self.settings.schedule_enabled:
             self._scheduler.start(self.settings.schedule_minutes * 60 * 1000)
         else:
