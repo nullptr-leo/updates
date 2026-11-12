@@ -58,7 +58,7 @@ class AppRow:
     def status_kind(self) -> str:
         if self.phase in ERROR_PHASES:
             return "error"
-        if self.phase == Phase.MANUAL:
+        if self.phase in (Phase.MANUAL, Phase.WAITING_NETWORK):
             return "warning"
         if self.phase in SUCCESS_PHASES:
             return "success"
@@ -100,7 +100,9 @@ class AppTableModel(QAbstractTableModel):
             if col == C_STATUS:
                 return row.status_text, row.status_kind
             if col == C_PROGRESS:
-                return row.percent, row.phase in ACTIVE_PHASES
+                return (row.percent,
+                        row.phase in ACTIVE_PHASES
+                        and row.phase != Phase.WAITING_NETWORK)
             if col == C_NAME:
                 return row.spec
             return None

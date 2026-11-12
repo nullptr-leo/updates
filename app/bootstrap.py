@@ -78,7 +78,8 @@ def run_cli(argv: list[str]) -> int:
         if event.error:
             print("   " + event.error.message, flush=True)
 
-    engine = UpdateEngine(settings, emit=emit, hooks=HOOKS)
+    engine = UpdateEngine(settings, emit=emit, hooks=HOOKS,
+                          wait_for_network=False)
     for spec in specs:
         engine.run(spec, mode, CancellationToken())
     return 0

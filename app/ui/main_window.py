@@ -22,7 +22,7 @@ from ..core.config import (
     CONFIG_PATH, ICON_PATH, IS_FROZEN, PROJECT_ROOT, Settings, load_settings,
     restart_command, save_settings,
 )
-from ..core.models import ACTIVE_PHASES, AppSpec, Mode, ProgressEvent
+from ..core.models import ACTIVE_PHASES, AppSpec, Mode, Phase, ProgressEvent
 from ..core.registry import spec_by_id, visible_specs
 from ..workers.update_worker import TaskPool
 from .table_model import (
@@ -314,6 +314,8 @@ class MainWindow(QMainWindow):
                 self.statusBar().showMessage(
                     f"{ev.app_id}: {ev.error.message}", 8000)
         self._update_stats()
+        if ev.phase == Phase.WAITING_NETWORK:
+            self.statusBar().showMessage(ev.message or "网络未连接，任务等待连接…")
         self._update_activity()
 
     def _on_idle(self) -> None:

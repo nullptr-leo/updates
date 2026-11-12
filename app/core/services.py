@@ -46,10 +46,118 @@ _NETWORK_ERRORS = (
     requests.exceptions.RequestException,
 )
 
+# Interval used when a task is suspended in "等待连接".
+NETWORK_POLL_SECONDS = 2.0
+
+# Flags from wininet.h used by InternetGetConnectedState.
+INTERNET_CONNECTION_MODEM = 0x01
+INTERNET_CONNECTION_LAN = 0x02
+INTERNET_CONNECTION_PROXY = 0x04
+INTERNET_CONNECTION_OFFLINE = 0x20
+
+# CLSID_NetworkListManager: Windows' own Internet connectivity verdict.
+_NLM_CLSID = "{DCB00C01-570F-4A9B-8D69-199FDBA5723B}"
+
 
 # --------------------------------------------------------------------------
 # network
 # --------------------------------------------------------------------------
+def _nlm_connected() -> bool | None:
+    """Ask Windows Network List Manager; ``None`` when COM is unavailable."""
+    if sys.platform != "win32":
+        return None
+    try:
+        import pythoncom
+        import win32com.client
+    except ImportError:  # pragma: no cover - pywin32 is optional at runtime
+        return None
+    try:
+        pythoncom.CoInitialize()
+    except Exception:  # pragma: no cover - COM may be initialized as MTA
+        return None
+    manager = None
+    try:
+        manager = win32com.client.Dispatch(_NLM_CLSID)
+        return bool(manager.IsConnectedToInternet)
+    except Exception:  # pragma: no cover - NLM is missing on old Windows
+        return None
+    finally:
+        # Release the COM interface before shutting down this thread's COM.
+        manager = None
+        pythoncom.CoUninitialize()
+
+
+def _wininet_connected() -> tuple[bool, str] | None:
+    """Fallback for machines without Network List Manager."""
+    if sys.platform != "win32":
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+        flags = wintypes.DWORD(0)
+        connected = ctypes.windll.wininet.InternetGetConnectedState(
+            ctypes.byref(flags), 0)
+    except (AttributeError, OSError):  # pragma: no cover
+        return None
+    state = flags.value
+    if state & INTERNET_CONNECTION_OFFLINE:
+        return False, "系统处于脱机模式"
+    if not connected or not state & (
+            INTERNET_CONNECTION_MODEM | INTERNET_CONNECTION_LAN
+            | INTERNET_CONNECTION_PROXY):
+        return False, "系统当前没有网络连接"
+    kind = ("代理" if state & INTERNET_CONNECTION_PROXY else
+            "局域网" if state & INTERNET_CONNECTION_LAN else "拨号")
+    return True, f"网络已连接（{kind}）"
+
+
+def _probe_reachability(timeout: float = 1.0) -> tuple[bool, str]:
+    """Last-resort TCP probe, also used on non-Windows platforms."""
+    import socket
+    for host, port in (("www.msftconnecttest.com", 80), ("1.1.1.1", 443),
+                       ("8.8.8.8", 443)):
+        try:
+            with socket.create_connection((host, port), timeout):
+                return True, "网络已连接"
+        except OSError:
+            continue
+    return False, "系统当前没有网络连接"
+
+
+def network_status() -> tuple[bool, str]:
+    """Return ``(connected, description)`` for the current Windows network.
+
+    Network List Manager reports whether Windows itself has Internet access,
+    so a connected-but-dead Wi-Fi is correctly seen as offline. Never raises:
+    a detection failure degrades to the next available backend.
+    """
+    if sys.platform == "win32":
+        connected = _nlm_connected()
+        if connected is not None:
+            return ((True, "网络已连接") if connected
+                    else (False, "Windows 未连接到 Internet"))
+        wininet = _wininet_connected()
+        if wininet is not None:
+            return wininet
+    return _probe_reachability()
+
+
+def is_connection_error(exc: BaseException) -> bool:
+    """Whether a failure is caused by connectivity rather than a bad response."""
+    current: BaseException | None = exc
+    for _ in range(5):
+        if current is None:
+            return False
+        if isinstance(current, (requests.exceptions.ConnectionError,
+                                requests.exceptions.Timeout,
+                                ConnectionError, TimeoutError)):
+            return True
+        if isinstance(current, QueryFailed) and str(current).startswith("网络错误"):
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
 def _proxies(settings: Settings | None) -> dict | None:
     addr = (settings.proxy if settings else "") or os.environ.get("UPDATE_PROXY_ADDR", "")
     if not addr:

@@ -53,6 +53,7 @@ class LogLevel(IntEnum):
 class Phase(Enum):
     IDLE = "等待中"
     QUEUED = "排队中"
+    WAITING_NETWORK = "等待连接"
     CHECKING = "检查中"
     PREPARING = "准备中"
     DOWNLOADING = "下载中"
@@ -67,7 +68,7 @@ class Phase(Enum):
 
 
 ACTIVE_PHASES = frozenset({
-    Phase.QUEUED, Phase.CHECKING, Phase.PREPARING,
+    Phase.QUEUED, Phase.WAITING_NETWORK, Phase.CHECKING, Phase.PREPARING,
     Phase.DOWNLOADING, Phase.INSTALLING,
 })
 TERMINAL_PHASES = frozenset({
@@ -82,6 +83,7 @@ ERROR_PHASES = frozenset({Phase.FAILED, Phase.CANCELLED, Phase.SKIPPED})
 PHASE_LOG_LEVEL: dict[Phase, LogLevel] = {
     Phase.IDLE: LogLevel.DEBUG,
     Phase.QUEUED: LogLevel.DEBUG,
+    Phase.WAITING_NETWORK: LogLevel.WARNING,
     Phase.CHECKING: LogLevel.DEBUG,
     Phase.PREPARING: LogLevel.INFO,
     Phase.DOWNLOADING: LogLevel.DEBUG,

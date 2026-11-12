@@ -28,6 +28,9 @@ from .ports import ProcessPort, SubprocessPort
 Emit = Callable[[ProgressEvent], None]
 Hooks = Mapping[str, Mapping[str, Callable[..., Any]]]
 
+# How many times a task may be restarted after a connection loss.
+NETWORK_ATTEMPTS = 3
+
 
 def _transform(raw: str, transform: str) -> str:
     if transform == "digits_dot":
@@ -98,12 +101,16 @@ class UpdateEngine:
         emit: Emit,
         port: ProcessPort | None = None,
         hooks: Hooks | None = None,
+        *,
+        wait_for_network: bool = True,
     ) -> None:
         self.settings = settings
         self.emit = emit
         self.port = port or SubprocessPort()
         self.hooks: Hooks = hooks or {}
         self.log = get_logger()
+        # One-shot CLI runs report "等待连接" instead of blocking forever.
+        self.wait_for_network = wait_for_network
 
     # ------------------------------------------------------------------
     def _hook(self, group: str, name: str) -> Callable[..., Any]:
@@ -339,91 +346,140 @@ class UpdateEngine:
         )
 
     # ------------------------------------------------------------------
+    # network gating
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _network_status() -> tuple[bool, str]:
+        try:
+            return services.network_status()
+        except Exception as exc:
+            get_logger().warning("读取 Windows 网络状态失败: %s", exc)
+            return True, "网络状态未知"
+
+    def _await_network(self, spec: AppSpec, token: CancellationToken,
+                       *, hold: bool = False) -> None:
+        """Suspend the task in WAITING_NETWORK until Windows is online again."""
+        online, detail = self._network_status()
+        if online and not hold:
+            return
+        self._send(spec, Phase.WAITING_NETWORK,
+                   message=f"{detail}，等待连接…")
+        while True:
+            token.raise_if_cancelled()
+            if token.wait(services.NETWORK_POLL_SECONDS):
+                raise Cancelled("任务已取消")
+            online, _ = self._network_status()
+            if online:
+                break
+        self.log.info("[%s] 网络已连接，继续执行", spec.id)
+        self._send(spec, Phase.QUEUED, message="网络已连接，继续任务")
+
+    # ------------------------------------------------------------------
     def run(self, spec: AppSpec, mode: Mode, token: CancellationToken) -> None:
         ctx = Context(self, spec, token)
-        local = remote = ""
-        needs: bool | None = None
-        try:
-            token.raise_if_cancelled()
-            self._send(spec, Phase.CHECKING, message="读取本地版本")
+        if not self.wait_for_network:
+            online, detail = self._network_status()
+            if not online:
+                self._send(spec, Phase.WAITING_NETWORK,
+                           message=f"{detail}，等待连接", finished=True)
+                return
+        retry_after_outage = False
+        for attempt in range(NETWORK_ATTEMPTS):
+            local = remote = ""
+            needs: bool | None = None
             try:
-                local = self._local_version(spec, mode, ctx)
-            except NotInstalled:
-                if mode != Mode.CHECK:
-                    raise
-                local = ""
-            self._send(spec, Phase.CHECKING, message="查询最新版本",
-                       local_version=local)
+                self._await_network(spec, token, hold=retry_after_outage)
+                retry_after_outage = False
+                token.raise_if_cancelled()
+                self._send(spec, Phase.CHECKING, message="读取本地版本")
+                try:
+                    local = self._local_version(spec, mode, ctx)
+                except NotInstalled:
+                    if mode != Mode.CHECK:
+                        raise
+                    local = ""
+                self._send(spec, Phase.CHECKING, message="查询最新版本",
+                           local_version=local)
 
-            info = self._remote_info(spec, ctx)
-            remote = info.version
-            needs = services.is_newer(remote, local,
-                                      lexicographic=spec.lexicographic)
-            if mode.is_force or info.extra.get("force_update"):
-                needs = True
-            self._send(spec, Phase.CHECKING, message="", local_version=local,
-                       remote_version=remote, needs_update=needs)
-            cache.update_app_cache(spec.id, local=local, remote=remote,
-                                   needs_update=needs)
-            self.log.info("[%s] local=%s remote=%s needs=%s",
-                          spec.id, local, remote, needs)
+                info = self._remote_info(spec, ctx)
+                remote = info.version
+                needs = services.is_newer(remote, local,
+                                          lexicographic=spec.lexicographic)
+                if mode.is_force or info.extra.get("force_update"):
+                    needs = True
+                self._send(spec, Phase.CHECKING, message="", local_version=local,
+                           remote_version=remote, needs_update=needs)
+                cache.update_app_cache(spec.id, local=local, remote=remote,
+                                       needs_update=needs)
+                self.log.info("[%s] local=%s remote=%s needs=%s",
+                              spec.id, local, remote, needs)
 
-            if mode == Mode.CHECK:
-                self._send(spec, Phase.DONE, message="检查完成",
-                           local_version=local, remote_version=remote,
-                           needs_update=needs, finished=True)
-                return
-            if not needs:
-                self._send(spec, Phase.UPTODATE, local_version=local,
-                           remote_version=remote, needs_update=False,
-                           finished=True)
-                return
-            if spec.manual_only or (spec.install and spec.install.kind == "manual"):
-                self._manual(spec, info, ctx, token)
-                self._send(spec, Phase.MANUAL, message="已打开下载页面",
-                           local_version=local, remote_version=remote,
-                           finished=True)
-                return
-
-            self._send(spec, Phase.PREPARING, message="准备下载",
-                       local_version=local, remote_version=remote,
-                       needs_update=True)
-            url = self._download_url(spec, info, ctx)
-            self._send(spec, Phase.DOWNLOADING, message="开始下载",
-                       local_version=local, remote_version=remote,
-                       needs_update=True)
-            with tempfile.TemporaryDirectory(prefix="us-") as tmp:
-                ext = self._extension(url, spec)
-                dest = os.path.join(tmp, f"{spec.id}{ext}")
-                self._download(url, dest, spec, token)
-                if mode == Mode.DOWNLOAD_ONLY:
-                    target_dir = download_dir()
-                    os.makedirs(target_dir, exist_ok=True)
-                    filename = (f"{spec.id}-{remote}{ext}" if remote
-                                else f"{spec.id}{ext}")
-                    shutil.copy2(dest, os.path.join(target_dir, filename))
-                    self._send(spec, Phase.DOWNLOADED, message=filename,
+                if mode == Mode.CHECK:
+                    self._send(spec, Phase.DONE, message="检查完成",
+                               local_version=local, remote_version=remote,
+                               needs_update=needs, finished=True)
+                    return
+                if not needs:
+                    self._send(spec, Phase.UPTODATE, local_version=local,
+                               remote_version=remote, needs_update=False,
+                               finished=True)
+                    return
+                if spec.manual_only or (spec.install and spec.install.kind == "manual"):
+                    self._manual(spec, info, ctx, token)
+                    self._send(spec, Phase.MANUAL, message="已打开下载页面",
                                local_version=local, remote_version=remote,
                                finished=True)
                     return
-                self._send(spec, Phase.INSTALLING, message="正在安装",
-                           local_version=local, remote_version=remote)
-                self._install(spec, dest, info, ctx, token)
-                self._post(spec, info, ctx, token)
-            cache.record_update_time()
-            self._send(spec, Phase.DONE, message="更新完成",
-                       local_version=local, remote_version=remote,
-                       needs_update=False, finished=True)
-        except Cancelled as exc:
-            self._finish_error(spec, Phase.CANCELLED, exc, local, remote)
-        except NotInstalled as exc:
-            self.log.info("[%s] skipped: %s", spec.id, exc)
-            self._send(spec, Phase.SKIPPED, message=str(exc),
-                       local_version=local, remote_version=remote,
-                       needs_update=needs, finished=True,
-                       error=ErrorInfo(kind="NotInstalled", message=str(exc)))
-        except Exception as exc:
-            self._finish_error(spec, Phase.FAILED, exc, local, remote)
+
+                self._send(spec, Phase.PREPARING, message="准备下载",
+                           local_version=local, remote_version=remote,
+                           needs_update=True)
+                url = self._download_url(spec, info, ctx)
+                self._send(spec, Phase.DOWNLOADING, message="开始下载",
+                           local_version=local, remote_version=remote,
+                           needs_update=True)
+                with tempfile.TemporaryDirectory(prefix="us-") as tmp:
+                    ext = self._extension(url, spec)
+                    dest = os.path.join(tmp, f"{spec.id}{ext}")
+                    self._download(url, dest, spec, token)
+                    if mode == Mode.DOWNLOAD_ONLY:
+                        target_dir = download_dir()
+                        os.makedirs(target_dir, exist_ok=True)
+                        filename = (f"{spec.id}-{remote}{ext}" if remote
+                                    else f"{spec.id}{ext}")
+                        shutil.copy2(dest, os.path.join(target_dir, filename))
+                        self._send(spec, Phase.DOWNLOADED, message=filename,
+                                   local_version=local, remote_version=remote,
+                                   finished=True)
+                        return
+                    self._send(spec, Phase.INSTALLING, message="正在安装",
+                               local_version=local, remote_version=remote)
+                    self._install(spec, dest, info, ctx, token)
+                    self._post(spec, info, ctx, token)
+                cache.record_update_time()
+                self._send(spec, Phase.DONE, message="更新完成",
+                           local_version=local, remote_version=remote,
+                           needs_update=False, finished=True)
+            except Cancelled as exc:
+                self._finish_error(spec, Phase.CANCELLED, exc, local, remote)
+                return
+            except NotInstalled as exc:
+                self.log.info("[%s] skipped: %s", spec.id, exc)
+                self._send(spec, Phase.SKIPPED, message=str(exc),
+                           local_version=local, remote_version=remote,
+                           needs_update=needs, finished=True,
+                           error=ErrorInfo(kind="NotInstalled", message=str(exc)))
+                return
+            except Exception as exc:
+                if (self.wait_for_network
+                        and attempt + 1 < NETWORK_ATTEMPTS
+                        and services.is_connection_error(exc)
+                        and not self._network_status()[0]):
+                    self.log.info("[%s] 网络中断，等待连接后重试", spec.id)
+                    retry_after_outage = True
+                    continue
+                self._finish_error(spec, Phase.FAILED, exc, local, remote)
+                return
 
 
 def _max_version(values: list[str]) -> str:

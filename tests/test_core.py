@@ -75,7 +75,49 @@ class VersionTests(unittest.TestCase):
                                          lexicographic=False))
 
 
+class NetworkStatusTests(unittest.TestCase):
+    def test_windows_offline_and_online_states(self):
+        with patch.object(services.sys, "platform", "win32"), \
+             patch.object(services, "_nlm_connected", return_value=False):
+            self.assertEqual(services.network_status(),
+                             (False, "Windows 未连接到 Internet"))
+        with patch.object(services.sys, "platform", "win32"), \
+             patch.object(services, "_nlm_connected", return_value=True):
+            self.assertEqual(services.network_status(),
+                             (True, "网络已连接"))
+
+    def test_detection_falls_back_to_wininet_then_probe(self):
+        with patch.object(services.sys, "platform", "win32"), \
+             patch.object(services, "_nlm_connected", return_value=None), \
+             patch.object(services, "_wininet_connected",
+                          return_value=(False, "系统当前没有网络连接")):
+            self.assertFalse(services.network_status()[0])
+        with patch.object(services.sys, "platform", "win32"), \
+             patch.object(services, "_nlm_connected", return_value=None), \
+             patch.object(services, "_wininet_connected", return_value=None), \
+             patch.object(services, "_probe_reachability",
+                          return_value=(True, "网络已连接")):
+            self.assertTrue(services.network_status()[0])
+
+    def test_connection_errors_are_distinguished(self):
+        import requests
+        from app.core.models import QueryFailed
+        cause = requests.exceptions.ConnectionError("offline")
+        wrapped = QueryFailed("网络错误: ConnectionError")
+        wrapped.__cause__ = cause
+        self.assertTrue(services.is_connection_error(wrapped))
+        self.assertTrue(services.is_connection_error(
+            QueryFailed("网络错误")))
+        self.assertFalse(services.is_connection_error(ValueError("bad regex")))
+
+
 class EngineTests(unittest.TestCase):
+    def setUp(self):
+        patcher = patch.object(services, "network_status",
+                               return_value=(True, "网络已连接"))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def _engine(self):
         events = []
         engine = UpdateEngine(Settings(), events.append, hooks=HOOKS)
@@ -138,6 +180,54 @@ class EngineTests(unittest.TestCase):
         with self.assertRaises(Cancelled):
             token.raise_if_cancelled()
 
+    def _offline_spec(self):
+        return AppSpec(
+            id="demo", name="Demo", homepage="",
+            remote=RemoteSpec(url="https://example.com", kind="regex",
+                              pattern=r"v([\d.]+)"),
+            install=InstallSpec(kind="installer"),
+        )
+
+    def test_offline_task_waits_for_connection_then_runs(self):
+        engine, events = self._engine()
+        with patch.object(services, "network_status", side_effect=[
+                (False, "Windows 未连接到 Internet"),
+                (True, "网络已连接")]), \
+             patch.object(services, "NETWORK_POLL_SECONDS", 0), \
+             patch.object(services, "http_get", return_value="v1.0.0"):
+            engine.run(self._offline_spec(), Mode.CHECK, CancellationToken())
+        phases = [e.phase for e in events]
+        self.assertIn(Phase.WAITING_NETWORK, phases)
+        self.assertFalse(events[0].finished)
+        self.assertEqual(events[-1].phase, Phase.DONE)
+        self.assertTrue(events[-1].finished)
+
+    def test_cli_reports_waiting_network_without_blocking(self):
+        events = []
+        engine = UpdateEngine(Settings(), events.append, hooks=HOOKS,
+                              wait_for_network=False)
+        with patch.object(services, "network_status",
+                          return_value=(False, "Windows 未连接到 Internet")):
+            engine.run(self._offline_spec(), Mode.CHECK, CancellationToken())
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].phase, Phase.WAITING_NETWORK)
+        self.assertTrue(events[0].finished)
+
+    def test_connection_loss_retries_after_reconnect(self):
+        from app.core.models import QueryFailed
+        engine, events = self._engine()
+        with patch.object(services, "network_status", side_effect=[
+                (True, "网络已连接"),
+                (False, "Windows 未连接到 Internet"),
+                (False, "Windows 未连接到 Internet"),
+                (True, "网络已连接")]), \
+             patch.object(services, "NETWORK_POLL_SECONDS", 0), \
+             patch.object(services, "http_get", side_effect=[
+                 QueryFailed("网络错误: ConnectionError"), "v1.0.0"]):
+            engine.run(self._offline_spec(), Mode.CHECK, CancellationToken())
+        self.assertIn(Phase.WAITING_NETWORK, [e.phase for e in events])
+        self.assertEqual(events[-1].phase, Phase.DONE)
+
 
 class ThreadingTests(unittest.TestCase):
     def test_task_pool_marshals_events_to_gui_thread(self):
@@ -158,13 +248,73 @@ class ThreadingTests(unittest.TestCase):
                               pattern=r"v([\d.]+)"),
             install=InstallSpec(kind="installer"),
         )
-        with patch.object(services, "http_get", return_value="v9.9.9"):
+        with patch.object(services, "network_status",
+                          return_value=(True, "网络已连接")), \
+             patch.object(services, "http_get", return_value="v9.9.9"):
             pool.submit([spec], Mode.CHECK)
             QTimer.singleShot(5000, app.quit)
             app.exec()
         self.assertTrue(received, "没有收到任何结构化事件")
         self.assertTrue(any(e.finished for e in received))
         self.assertEqual(received[-1].remote_version, "9.9.9")
+
+    def _pool_spec(self):
+        return AppSpec(
+            id="threaded", name="Threaded", homepage="",
+            remote=RemoteSpec(url="https://example.com", kind="regex",
+                              pattern=r"v([\d.]+)"),
+            install=InstallSpec(kind="installer"),
+        )
+
+    def test_offline_submit_waits_and_resumes_on_connection(self):
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtCore import QTimer
+        from PySide6.QtWidgets import QApplication
+        from app.workers.update_worker import TaskPool
+
+        app = QApplication.instance() or QApplication([])
+        received: list = []
+        pool = TaskPool(Settings(), hooks=HOOKS)
+        pool.event.connect(received.append)
+        pool.idle.connect(app.quit)
+        spec = self._pool_spec()
+        with patch.object(services, "network_status",
+                          return_value=(False, "Windows 未连接到 Internet")):
+            self.assertEqual(pool.submit([spec], Mode.CHECK), 1)
+        self.assertEqual(received[-1].phase, Phase.WAITING_NETWORK)
+        self.assertFalse(received[-1].finished)
+        self.assertEqual(pool.active_count(), 1)
+        self.assertFalse(any(e.phase == Phase.DONE for e in received))
+
+        with patch.object(services, "network_status",
+                          return_value=(True, "网络已连接")), \
+             patch.object(services, "http_get", return_value="v9.9.9"):
+            pool._resume_pending()
+            QTimer.singleShot(5000, app.quit)
+            app.exec()
+        self.assertTrue(any(e.phase == Phase.DONE for e in received))
+        self.assertEqual(pool.active_count(), 0)
+
+    def test_watchdog_does_not_cancel_waiting_tasks(self):
+        import os
+        import time
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+        from app.workers.update_worker import TaskPool
+
+        QApplication.instance() or QApplication([])
+        pool = TaskPool(Settings(timeout_seconds=0), hooks=HOOKS)
+        spec = self._pool_spec()
+        with patch.object(services, "network_status",
+                          return_value=(False, "Windows 未连接到 Internet")):
+            pool.submit([spec], Mode.CHECK)
+        with pool._lock:
+            pool._starts[spec.id] = time.monotonic() - 1000
+        pool._check_timeouts()
+        self.assertFalse(pool._tokens[spec.id].cancelled)
+        pool.cancel_all()
+        pool.wait_for_done(1000)
 
 
 class CacheConcurrencyTests(unittest.TestCase):
@@ -212,12 +362,33 @@ class CacheConcurrencyTests(unittest.TestCase):
         )
         events = []
         engine = UpdateEngine(Settings(), events.append, hooks=HOOKS)
-        with patch.object(services, "http_get", return_value="v1.2.3"), \
+        with patch.object(services, "network_status",
+                          return_value=(True, "网络已连接")), \
+             patch.object(services, "http_get", return_value="v1.2.3"), \
              patch.object(cache, "atomic_write_json",
                           side_effect=PermissionError("denied")):
             engine.run(spec, Mode.CHECK, CancellationToken())
         self.assertEqual(events[-1].phase, Phase.DONE)
         self.assertTrue(events[-1].finished)
+
+
+class WaitingNetworkUiTests(unittest.TestCase):
+    def test_status_is_chinese_and_warning_colored(self):
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+        from app.ui.table_model import AppRow
+        QApplication.instance() or QApplication([])
+        row = AppRow(spec=AppSpec(id="demo", name="Demo"),
+                     phase=Phase.WAITING_NETWORK)
+        self.assertEqual(row.status_text, "等待连接")
+        self.assertEqual(row.status_kind, "warning")
+
+    def test_waiting_phase_is_active_and_visible_in_default_log(self):
+        from app.core.models import ACTIVE_PHASES, LogLevel, level_for_phase
+        self.assertIn(Phase.WAITING_NETWORK, ACTIVE_PHASES)
+        self.assertEqual(level_for_phase(Phase.WAITING_NETWORK),
+                         LogLevel.WARNING)
 
 
 class LogLevelTests(unittest.TestCase):

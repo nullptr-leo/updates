@@ -45,6 +45,8 @@ def main() -> int:
         "winrt", "winrt.windows.management.deployment",
         "winsdk", "winsdk.windows.management.deployment",
         "PySide6.QtNetwork",
+        # Used lazily to read Windows' Internet connectivity state.
+        "pythoncom", "win32com.client",
     ):
         if available(module):
             args += ["--hidden-import", module]
