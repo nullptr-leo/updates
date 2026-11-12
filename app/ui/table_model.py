@@ -15,8 +15,11 @@ from ..core.models import (
     ProgressEvent,
 )
 
-COLUMNS = ("名称", "分类", "本地版本", "最新版本", "状态", "进度", "上次检查")
-C_NAME, C_CATEGORY, C_LOCAL, C_REMOTE, C_STATUS, C_PROGRESS, C_CHECKED = range(7)
+COLUMNS = ("名称", "分类", "本地版本", "最新版本", "状态", "上次检查")
+C_NAME, C_CATEGORY, C_LOCAL, C_REMOTE, C_STATUS, C_CHECKED = range(6)
+
+# Download progress shown behind the status cell: (percent, downloading).
+PROGRESS_ROLE = Qt.ItemDataRole.UserRole + 1
 
 
 @dataclass
@@ -99,13 +102,11 @@ class AppTableModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.UserRole:
             if col == C_STATUS:
                 return row.status_text, row.status_kind
-            if col == C_PROGRESS:
-                return (row.percent,
-                        row.phase in ACTIVE_PHASES
-                        and row.phase != Phase.WAITING_NETWORK)
             if col == C_NAME:
                 return row.spec
             return None
+        if role == PROGRESS_ROLE and col == C_STATUS:
+            return row.percent, row.phase == Phase.DOWNLOADING
         if role == Qt.ItemDataRole.DisplayRole:
             return {
                 C_NAME: row.spec.name,
@@ -113,7 +114,6 @@ class AppTableModel(QAbstractTableModel):
                 C_LOCAL: row.local or "—",
                 C_REMOTE: row.remote or "—",
                 C_STATUS: row.status_text,
-                C_PROGRESS: "",
                 C_CHECKED: (time.strftime("%m-%d %H:%M", time.localtime(row.checked_at))
                             if row.checked_at else "—"),
             }[col]

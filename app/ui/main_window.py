@@ -26,13 +26,13 @@ from ..core.models import ACTIVE_PHASES, AppSpec, Mode, Phase, ProgressEvent
 from ..core.registry import spec_by_id, visible_specs
 from ..workers.update_worker import TaskPool
 from .table_model import (
-    C_CATEGORY, C_CHECKED, C_LOCAL, C_NAME, C_PROGRESS, C_REMOTE, C_STATUS,
+    C_CATEGORY, C_CHECKED, C_LOCAL, C_NAME, C_REMOTE, C_STATUS,
     AppFilterProxyModel, AppTableModel,
 )
 from .theme import palette, stylesheet
 from .tray import Tray
 from .widgets import (
-    ActivityPanel, DetailPanel, ProgressDelegate, SettingsDialog, StatusDelegate,
+    ActivityPanel, DetailPanel, SettingsDialog, StatusDelegate,
 )
 
 
@@ -99,6 +99,7 @@ class MainWindow(QMainWindow):
         self._total = 0
         self._auto_cycle = False
         self._auto_update_ids: set[str] = set()
+        self._columns_tuned = False
         self._async = _AsyncSignals()
         self._async.archiveDone.connect(self._on_archive_done)
         self._async.selfUpdateDone.connect(self._on_self_update_done)
@@ -206,8 +207,6 @@ class MainWindow(QMainWindow):
         for col in (C_CATEGORY, C_LOCAL, C_REMOTE, C_CHECKED):
             hh.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
         hh.setSectionResizeMode(C_STATUS, QHeaderView.ResizeMode.Stretch)
-        self.table.setColumnWidth(C_PROGRESS, 120)
-        self.table.setColumnWidth(C_STATUS, 190)
 
         self.detail = DetailPanel()
         self.detail.actionRequested.connect(self._on_detail_action)
@@ -225,6 +224,32 @@ class MainWindow(QMainWindow):
         vertical.setSizes([430, 160])
         root.addWidget(vertical, 1)
         self.statusBar().showMessage("就绪")
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        if self._columns_tuned:
+            return
+        self._columns_tuned = True
+        QTimer.singleShot(0, self._tune_columns)
+
+    def _tune_columns(self) -> None:
+        """Trim the 1.5x version columns to 90%; the released width goes to status."""
+        local = self.table.columnWidth(C_LOCAL)
+        remote = self.table.columnWidth(C_REMOTE)
+        status = self.table.columnWidth(C_STATUS)
+        if min(local, remote, status) <= 0:
+            QTimer.singleShot(50, self._tune_columns)
+            return
+        local_w = int(int(local * 1.5) * 0.9)
+        remote_w = int(int(remote * 1.5) * 0.9)
+        hh = self.table.horizontalHeader()
+        for col in (C_LOCAL, C_REMOTE, C_STATUS):
+            hh.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
+        self.table.setColumnWidth(C_LOCAL, local_w)
+        self.table.setColumnWidth(C_REMOTE, remote_w)
+        status_target = max(min(status, 140),
+                            status - (local_w - local) - (remote_w - remote))
+        self.table.setColumnWidth(C_STATUS, status_target)
 
     def _build_more_menu(self) -> QMenu:
         menu = QMenu(self)
@@ -570,9 +595,7 @@ class MainWindow(QMainWindow):
         app.setStyleSheet(stylesheet(resolved))
         colors = palette(resolved)
         self._status_delegate = StatusDelegate(colors, self.table)
-        self._progress_delegate = ProgressDelegate(colors, self.table)
         self.table.setItemDelegateForColumn(C_STATUS, self._status_delegate)
-        self.table.setItemDelegateForColumn(C_PROGRESS, self._progress_delegate)
 
     def _update_stats(self) -> None:
         rows = [self.model.row_at(i) for i in range(self.model.rowCount())]

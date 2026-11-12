@@ -240,7 +240,7 @@ class UpdateEngine:
             if pct - last_pct < 1.0 and pct < 99.9:
                 return
             last_pct = pct
-            text = (f"{current / 1048576:.1f}M / {total / 1048576:.1f}M"
+            text = (f"{current / 1048576:.1f}M/{total / 1048576:.1f}M"
                     if total else f"{current / 1048576:.1f}M")
             self._send(spec, Phase.DOWNLOADING, message=text,
                        current=current, total=total)

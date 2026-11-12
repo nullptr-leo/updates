@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 
 from ..core.config import Settings
 from ..core.models import AppSpec, LogLevel, ProgressEvent
-from .table_model import AppRow
+from .table_model import PROGRESS_ROLE, AppRow
 
 
 class StatusDelegate(QStyledItemDelegate):
@@ -32,6 +32,9 @@ class StatusDelegate(QStyledItemDelegate):
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = option.rect
+        progress = index.data(PROGRESS_ROLE)
+        if isinstance(progress, tuple) and progress[1]:
+            self._paint_progress(painter, rect, float(progress[0]))
         dot = QRect(rect.left() + 9, rect.center().y() - 4, 8, 8)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QBrush(QColor(self.colors.get(kind, self.colors["idle"]))))
@@ -42,30 +45,28 @@ class StatusDelegate(QStyledItemDelegate):
                                         Qt.AlignmentFlag.AlignLeft), text)
         painter.restore()
 
-
-class ProgressDelegate(QStyledItemDelegate):
-    def __init__(self, colors: dict[str, str], parent=None) -> None:
-        super().__init__(parent)
-        self.colors = colors
-
-    def paint(self, painter: QPainter, option, index) -> None:
-        value = index.data(Qt.ItemDataRole.UserRole)
-        percent, active = value if isinstance(value, tuple) else (0.0, False)
-        if percent <= 0 and not active:
+    def _paint_progress(self, painter: QPainter, rect: QRect,
+                        percent: float) -> None:
+        bar = rect.adjusted(2, 2, -2, -2)
+        if bar.width() <= 0 or bar.height() <= 0:
             return
-        painter.save()
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        rect = option.rect.adjusted(8, 0, -8, 0)
-        bar = QRect(rect.left(), rect.center().y() - 4, rect.width(), 8)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QBrush(QColor(self.colors["track"])))
+        track = QColor(self.colors["running"])
+        track.setAlpha(14)
+        painter.setBrush(QBrush(track))
         painter.drawRoundedRect(bar, 4, 4)
-        width = int(bar.width() * max(2.0, percent) / 100.0)
-        if width > 0:
-            fill = QRect(bar.left(), bar.top(), width, bar.height())
-            painter.setBrush(QBrush(QColor(self.colors["running"])))
-            painter.drawRoundedRect(fill, 4, 4)
-        painter.restore()
+        width = int(bar.width() * min(100.0, max(3.0, percent)) / 100.0)
+        fill = QColor(self.colors["running"])
+        fill.setAlpha(46)
+        painter.setBrush(QBrush(fill))
+        painter.drawRoundedRect(
+            QRect(bar.left(), bar.top(), width, bar.height()), 4, 4)
+        if percent > 0 and width > 6:
+            edge = QColor(self.colors["running"])
+            edge.setAlpha(120)
+            painter.setBrush(QBrush(edge))
+            painter.drawRoundedRect(
+                QRect(bar.left() + width - 2, bar.top(), 2, bar.height()), 1, 1)
 
 
 class _DetailScrollArea(QScrollArea):
