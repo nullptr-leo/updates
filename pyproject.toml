@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "update-scripts"
-version = "2.0.172"
+version = "2.0.173"
 description = "PySide6 desktop updater for Windows applications"
 requires-python = ">=3.10"
 dependencies = [
@@ -23,6 +23,3 @@ update-scripts = "app.bootstrap:run"
 
 [tool.setuptools.packages.find]
 include = ["app*"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]

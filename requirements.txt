@@ -17,6 +17,4 @@ py7zr>=0.20; sys_platform == "win32"
 
 # Development / build only (not required to run the application):
 #   pyinstaller -> build_exe.py
-#   pytest      -> test runner (tests themselves use stdlib unittest)
 # pyinstaller
-# pytest

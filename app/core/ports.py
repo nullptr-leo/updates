@@ -32,7 +32,7 @@ class ProcessPort(Protocol):
 
 
 class SubprocessPort:
-    """Default port, usable from CLI/tests without a Qt event loop."""
+    """Default port, usable from the CLI without a Qt event loop."""
 
     def run(
         self,
