@@ -1,6 +1,8 @@
 """Core-layer tests. Run with: python -m unittest discover -s tests -v"""
 from __future__ import annotations
 
+import os
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -978,6 +980,131 @@ class UptodateCheckTests(unittest.TestCase):
         spec, events = self._check("1.0.0", "v2.0.0")
         self.assertEqual(events[-1].phase, Phase.DONE)
         self.assertEqual(self._row(spec, events).status_text, "可更新")
+
+
+class ArchiveFallbackTests(unittest.TestCase):
+    @staticmethod
+    def _bcj2_error():
+        return Exception(
+            b"\x03\x03\x01\x1b",
+            "BCJ2 filter is not supported by py7zr. "
+            "Please use another tool to extract it.",
+        )
+
+    @staticmethod
+    def _fake_py7zr(*, fail=None, names=None, partial_file=None):
+        import types
+        module = types.ModuleType("py7zr")
+
+        class SevenZipFile:
+            def __init__(self, path, mode):
+                self.path = path
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def getnames(self):
+                if fail:
+                    raise fail
+                return list(names or [])
+
+            def extractall(self, dest):
+                written = []
+                if fail and partial_file:
+                    written.append(partial_file)
+                elif not fail:
+                    written.extend(names or [])
+                for name in written:
+                    target = os.path.join(dest, name)
+                    os.makedirs(os.path.dirname(target), exist_ok=True)
+                    with open(target, "w", encoding="utf-8") as fh:
+                        fh.write("partial" if name == partial_file else "ok")
+                if fail:
+                    raise fail
+
+        module.SevenZipFile = SevenZipFile
+        return module
+
+    def test_bcj2_failure_falls_back_after_clearing_partial_output(self):
+        import sys
+        from app.core import services
+        fake = self._fake_py7zr(fail=self._bcj2_error(),
+                                partial_file="vlc-3.0.25/broken.exe")
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = os.path.join(tmp, "dest")
+            os.makedirs(dest)
+            with patch.dict(sys.modules, {"py7zr": fake}), \
+                 patch.object(services, "_winrar_extract") as winrar:
+                services.extract_archive("vlc.7z", dest)
+            winrar.assert_called_once()
+            self.assertEqual(os.listdir(dest), [])
+
+    def test_both_backends_fail_with_readable_chinese_error(self):
+        import sys
+        from app.core import services
+        from app.core.models import QueryFailed
+        fake = self._fake_py7zr(fail=self._bcj2_error())
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.dict(sys.modules, {"py7zr": fake}), \
+             patch.object(services, "_winrar_extract",
+                          side_effect=QueryFailed("WinRAR 解压失败（退出码 2）")):
+            with self.assertRaises(QueryFailed) as ctx:
+                services.extract_archive("vlc.7z", tmp)
+        text = str(ctx.exception)
+        self.assertIn("BCJ2", text)
+        self.assertIn("WinRAR", text)
+        self.assertNotIn("\\x03", text)
+
+    def test_winrar_exit_code_is_checked(self):
+        from app.core import services
+        from app.core.models import QueryFailed
+        with patch.object(services, "_winrar_exe", return_value="WinRAR.exe"), \
+             patch.object(services.SubprocessPort, "run", return_value=2):
+            with self.assertRaisesRegex(QueryFailed, "退出码 2"):
+                services._winrar_extract("vlc.7z", "dest", None)
+
+    def test_missing_winrar_is_not_reported_as_app_not_installed(self):
+        from app.core import services
+        from app.core.models import NotInstalled, QueryFailed
+        with patch.object(services, "find_install_dir",
+                          side_effect=NotInstalled("未安装: WinRAR")):
+            with self.assertRaises(QueryFailed):
+                services._winrar_exe(None)
+
+    def test_list_archive_falls_back_to_winrar(self):
+        import sys
+        from app.core import services
+        fake = self._fake_py7zr(fail=self._bcj2_error())
+
+        def fake_extract(path, dest, settings):
+            folder = os.path.join(dest, "vlc-3.0.25")
+            os.makedirs(folder, exist_ok=True)
+            with open(os.path.join(folder, "vlc.exe"), "w",
+                      encoding="utf-8") as fh:
+                fh.write("x")
+
+        with patch.dict(sys.modules, {"py7zr": fake}), \
+             patch.object(services, "_winrar_extract",
+                          side_effect=fake_extract):
+            names = services.list_archive("vlc.7z")
+        self.assertIn("vlc-3.0.25/vlc.exe", names)
+
+    def test_py7zr_success_does_not_invoke_winrar(self):
+        import sys
+        from app.core import services
+        fake = self._fake_py7zr(names=["vlc-3.0.25/vlc.exe"])
+        with patch.dict(sys.modules, {"py7zr": fake}), \
+             patch.object(services, "_winrar_extract") as winrar, \
+             tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(services.list_archive("vlc.7z"),
+                             ["vlc-3.0.25/vlc.exe"])
+            services.extract_archive("vlc.7z", tmp)
+            self.assertTrue(os.path.isfile(
+                os.path.join(tmp, "vlc-3.0.25", "vlc.exe")))
+            winrar.assert_not_called()
 
 
 if __name__ == "__main__":

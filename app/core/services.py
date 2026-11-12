@@ -23,6 +23,7 @@ from typing import Callable, Iterable, Sequence
 import requests
 from packaging import version as pkg_version
 
+from .atomic_io import rmtree_with_retry, temporary_workspace
 from .cancellation import CancellationToken
 from .config import Settings, UNRAR_DLL
 from .models import Cancelled, LocalSpec, NotInstalled, QueryFailed, TimedOut
@@ -427,6 +428,67 @@ def is_newer(remote: str, local: str, *, lexicographic: bool = False) -> bool:
 # --------------------------------------------------------------------------
 # archives
 # --------------------------------------------------------------------------
+def _archive_reason(exc: BaseException) -> str:
+    """py7zr reports unsupported filters as ``(b'\\x03...', 'BCJ2 ...')``."""
+    parts = [str(arg) for arg in exc.args if not isinstance(arg, bytes)]
+    text = " ".join(parts).strip() or str(exc) or type(exc).__name__
+    if "BCJ2" in text.upper():
+        return "压缩包使用了 py7zr 不支持的 BCJ2 过滤器"
+    return text[:180]
+
+
+def _winrar_exe(settings: Settings | None) -> str:
+    try:
+        folder = find_install_dir("WinRAR", settings)
+    except NotInstalled as exc:
+        raise QueryFailed(
+            "未找到 WinRAR，无法解压此压缩包（建议安装 WinRAR 或 7-Zip）"
+        ) from exc
+    exe = os.path.join(folder, "WinRAR.exe")
+    if not os.path.isfile(exe):
+        raise QueryFailed("找不到 WinRAR.exe，无法解压此压缩包")
+    return exe
+
+
+def _winrar_extract(path: str, dest: str, settings: Settings | None) -> None:
+    exe = _winrar_exe(settings)
+    code = SubprocessPort().run(
+        [exe, "x", "-o+", "-inul", "-ibck", path, dest + os.sep],
+        timeout=300,
+    )
+    # WinRAR returns 0 on success and 1 for non-fatal warnings.
+    if code not in (0, 1):
+        raise QueryFailed(f"WinRAR 解压失败（退出码 {code}）")
+
+
+def _winrar_list(path: str, settings: Settings | None) -> list[str]:
+    """List members via WinRAR when py7zr cannot read the archive header."""
+    with temporary_workspace(prefix="us-7z-list-") as tmp:
+        _winrar_extract(path, tmp, settings)
+        names: list[str] = []
+        for root, dirs, files in os.walk(tmp):
+            for name in dirs:
+                rel = os.path.relpath(os.path.join(root, name), tmp)
+                names.append(rel.replace(os.sep, "/") + "/")
+            for name in files:
+                rel = os.path.relpath(os.path.join(root, name), tmp)
+                names.append(rel.replace(os.sep, "/"))
+        return names
+
+
+def _clear_extracted(dest: str) -> None:
+    """Discard a partial py7zr extraction before retrying with WinRAR."""
+    for name in os.listdir(dest):
+        item = os.path.join(dest, name)
+        if os.path.isdir(item) and not os.path.islink(item):
+            rmtree_with_retry(item)
+        else:
+            try:
+                os.remove(item)
+            except OSError:
+                pass
+
+
 def list_archive(path: str) -> list[str]:
     lower = path.lower()
     if lower.endswith(".zip"):
@@ -437,8 +499,15 @@ def list_archive(path: str) -> list[str]:
             import py7zr
             with py7zr.SevenZipFile(path, "r") as zf:
                 return zf.getnames()
-        except ImportError as exc:
-            raise QueryFailed("需要 py7zr 才能读取 .7z 压缩包") from exc
+        except ImportError:
+            return _winrar_list(path, None)
+        except Exception as exc:
+            try:
+                return _winrar_list(path, None)
+            except Exception as fallback_exc:
+                raise QueryFailed(
+                    f"读取 .7z 失败：{_archive_reason(exc)}；{fallback_exc}"
+                ) from exc
     if lower.endswith(".rar"):
         try:
             import unrar  # noqa: F401
@@ -449,16 +518,6 @@ def list_archive(path: str) -> list[str]:
         except ImportError as exc:
             raise QueryFailed("需要 unrar 才能读取 .rar 压缩包") from exc
     raise QueryFailed(f"不支持的压缩包: {path}")
-
-
-def _winrar_extract(path: str, dest: str, settings: Settings | None) -> None:
-    winrar = os.path.join(find_install_dir("WinRAR", settings), "WinRAR.exe")
-    if not os.path.isfile(winrar):
-        raise QueryFailed("找不到 WinRAR.exe，且缺少对应的 Python 解压库")
-    SubprocessPort().run(
-        [winrar, "x", "-o+", "-inul", "-ibck", path, dest + os.sep],
-        timeout=300,
-    )
 
 
 def extract_archive(path: str, dest: str, *, settings: Settings | None = None) -> None:
@@ -473,9 +532,24 @@ def extract_archive(path: str, dest: str, *, settings: Settings | None = None) -
             import py7zr
         except ImportError:
             _winrar_extract(path, dest, settings)
-        else:
+            return
+        try:
             with py7zr.SevenZipFile(path, "r") as zf:
                 zf.extractall(dest)
+        except Exception as exc:
+            # VLC nightly builds use the BCJ2 filter, which py7zr cannot
+            # decode. py7zr may already have written part of the archive, so
+            # the WinRAR fallback must start from a clean directory.
+            from .logging_setup import get_logger
+            get_logger().info("py7zr 解压失败，改用 WinRAR：%s",
+                              _archive_reason(exc))
+            _clear_extracted(dest)
+            try:
+                _winrar_extract(path, dest, settings)
+            except Exception as fallback_exc:
+                raise QueryFailed(
+                    f"解压失败：{_archive_reason(exc)}；{fallback_exc}"
+                ) from exc
         return
     if lower.endswith(".rar"):
         try:
