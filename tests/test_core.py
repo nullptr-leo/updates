@@ -798,5 +798,50 @@ class ScheduledAutoUpdateTests(unittest.TestCase):
                          self.window.settings.schedule_minutes * 60 * 1000)
 
 
+class DownloadStatusTests(unittest.TestCase):
+    def test_download_start_event_has_no_redundant_message(self):
+        from app.core import cache
+        spec = AppSpec(
+            id="demo", name="Demo", homepage="",
+            local=LocalSpec(kind="exe", target="demo.exe"),
+            remote=RemoteSpec(url="https://example.com", kind="regex",
+                              pattern=r"v([\d.]+)"),
+            download=DownloadSpec(url="https://example.com/demo.exe"),
+            install=InstallSpec(kind="installer"),
+        )
+        events = []
+        engine = UpdateEngine(Settings(), events.append, hooks=HOOKS)
+        with patch.object(services, "network_status",
+                          return_value=(True, "网络已连接")), \
+             patch.object(services, "get_local_version", return_value="1.0.0"), \
+             patch.object(services, "http_get", return_value="v1.2.3"), \
+             patch.object(engine, "_download"), \
+             patch.object(engine, "_install"), \
+             patch.object(engine, "_post"), \
+             patch.object(cache, "record_update_time"):
+            engine.run(spec, Mode.UPDATE, CancellationToken())
+        starts = [e for e in events if e.phase == Phase.DOWNLOADING]
+        self.assertTrue(starts)
+        self.assertEqual(starts[0].message, "")
+        self.assertEqual(events[-1].phase, Phase.DONE)
+
+    def test_status_is_plain_at_start_and_keeps_byte_progress(self):
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+        from app.core.models import ProgressEvent
+        from app.ui.table_model import AppTableModel
+        app = QApplication.instance() or QApplication([])
+        model = AppTableModel([AppSpec(id="demo", name="Demo")], parent=app)
+        model.apply_event(ProgressEvent(app_id="demo", phase=Phase.PREPARING,
+                                        message="准备下载"))
+        model.apply_event(ProgressEvent(app_id="demo", phase=Phase.DOWNLOADING))
+        self.assertEqual(model.row_at(0).status_text, "下载中")
+        model.apply_event(ProgressEvent(app_id="demo", phase=Phase.DOWNLOADING,
+                                        message="1.0M / 2.0M", current=1,
+                                        total=2))
+        self.assertEqual(model.row_at(0).status_text, "下载中 1.0M / 2.0M")
+
+
 if __name__ == "__main__":
     unittest.main()

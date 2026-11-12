@@ -1,0 +1,22 @@
+# Runtime dependencies for update-scripts.
+# Mirrors [project].dependencies in pyproject.toml.
+# Install: python -m pip install -r requirements.txt
+
+PySide6>=6.6
+requests[socks]>=2.31
+packaging>=23.0
+pywin32>=306; sys_platform == "win32"
+py7zr>=0.20; sys_platform == "win32"
+
+# Optional runtime extras - imported lazily, only needed by specific recipes.
+# Uncomment the ones you need:
+#   winsdk / winrt -> AppX package version lookup (app/core/services.py)
+#   unrar          -> legacy .rar archives (otherwise falls back to WinRAR.exe)
+# winsdk; sys_platform == "win32"
+# unrar; sys_platform == "win32"
+
+# Development / build only (not required to run the application):
+#   pyinstaller -> build_exe.py
+#   pytest      -> test runner (tests themselves use stdlib unittest)
+# pyinstaller
+# pytest

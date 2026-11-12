@@ -151,7 +151,9 @@ class AppTableModel(QAbstractTableModel):
             return
         row = self._rows[i]
         row.phase = ev.phase
-        if ev.message:
+        # A download-start event has no message; clearing the previous stage's
+        # text keeps the status column from showing a stale suffix.
+        if ev.message or ev.phase == Phase.DOWNLOADING:
             row.message = ev.message
         if ev.local_version:
             row.local = ev.local_version

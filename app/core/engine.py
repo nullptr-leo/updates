@@ -463,7 +463,7 @@ class UpdateEngine:
                            local_version=local, remote_version=remote,
                            needs_update=True)
                 url = self._download_url(spec, info, ctx)
-                self._send(spec, Phase.DOWNLOADING, message="开始下载",
+                self._send(spec, Phase.DOWNLOADING,
                            local_version=local, remote_version=remote,
                            needs_update=True)
                 with tempfile.TemporaryDirectory(prefix="us-") as tmp:
