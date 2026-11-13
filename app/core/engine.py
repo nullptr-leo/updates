@@ -55,10 +55,33 @@ def _json_path(text: str, path: str) -> Any:
     return value
 
 
+_LOCK_HINTS = (
+    "winerror 32", "winerror 33", "errno 13", "permission denied",
+    "access is denied", "拒绝访问", "另一个程序正在使用",
+)
+
+
+def _is_lock_error(exc: BaseException) -> bool:
+    """Whether a copy failed because Windows still holds the files open."""
+    if isinstance(exc, shutil.Error):
+        problems = exc.args[0] if exc.args and isinstance(exc.args[0], list) else []
+        reasons = [str(item[2]).lower() for item in problems
+                   if isinstance(item, (tuple, list)) and len(item) == 3]
+    else:
+        reasons = [str(exc).lower()]
+    return any(hint in reason for reason in reasons for hint in _LOCK_HINTS)
+
+
 def _friendly(exc: BaseException) -> str:
     name = type(exc).__name__
     if any(token in name for token in ("Connection", "Timeout", "HTTP", "Proxy")):
         return "网络错误"
+    if isinstance(exc, shutil.Error):
+        problems = exc.args[0] if exc.args and isinstance(exc.args[0], list) else []
+        files = [os.path.basename(str(item[1])) for item in problems
+                 if isinstance(item, (tuple, list)) and len(item) == 3]
+        return ("文件被占用，无法覆盖：" + "、".join(dict.fromkeys(files))
+                if files else str(exc) or name)
     return str(exc) or name
 
 
@@ -268,6 +291,29 @@ class UpdateEngine:
             head, _, value = action.partition(":")
             if head == "taskkill" and value:
                 services.kill_process(value)
+            elif head == "taskkilltree" and value:
+                services.kill_process(value, tree=True)
+
+    @staticmethod
+    def _retry_on_lock(operation: Callable[[], None],
+                       on_lock: Callable[[], None] | None = None,
+                       attempts: int = 3) -> None:
+        """Retry a copy while Windows is still releasing file handles.
+
+        The caller has already closed the app and its process tree; a short
+        backoff is still needed because taskkill returns before the handles
+        are gone. Never guesses process names from the failed file paths.
+        """
+        for attempt in range(attempts):
+            try:
+                operation()
+                return
+            except (shutil.Error, PermissionError) as exc:
+                if attempt == attempts - 1 or not _is_lock_error(exc):
+                    raise
+                if on_lock is not None:
+                    on_lock()
+                time.sleep(0.5 * (attempt + 1))
 
     def _install(self, spec: AppSpec, dest: str, info: RemoteInfo,
                  ctx: Context, token: CancellationToken) -> None:
@@ -311,6 +357,7 @@ class UpdateEngine:
             return
         if inst.kind == "extract":
             target_dir = ctx.install_dir(create=True)
+            unlock = lambda: self._close_running(spec)
             with temporary_workspace(prefix="us-extract-") as tmp:
                 services.extract_archive(dest, tmp, settings=self.settings)
                 source = self._extract_source(tmp, inst)
@@ -320,9 +367,12 @@ class UpdateEngine:
                     name = (os.path.basename(source)
                             if any(c in inst.subdir for c in "*?")
                             else inst.subdir)
-                    shutil.copy2(source, os.path.join(target_dir, name))
+                    target = os.path.join(target_dir, name)
+                    self._retry_on_lock(lambda: shutil.copy2(source, target), unlock)
                 else:
-                    shutil.copytree(source, target_dir, dirs_exist_ok=True)
+                    self._retry_on_lock(
+                        lambda: shutil.copytree(source, target_dir, dirs_exist_ok=True),
+                        unlock)
             return
         raise QueryFailed(f"未知的安装方式: {inst.kind}")
 
@@ -333,6 +383,8 @@ class UpdateEngine:
             head, _, value = action.partition(":")
             if head == "taskkill":
                 services.kill_process(value)
+            elif head == "taskkilltree":
+                services.kill_process(value, tree=True)
             elif head == "path":
                 base = ctx.install_dir() if spec.install_dirs else ""
                 if value in ("", "self", "."):

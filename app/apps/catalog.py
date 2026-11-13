@@ -290,7 +290,7 @@ SPECS = (
                r"Snow Shot ([\d\.]*)"),
          url("https://github.com/mg-chao/snow-apps/releases/download/v{version}_snow-shot/snow-shot-{version}-windows-x64-portable.zip"),
          extract("overwrite"),
-         post=("taskkill:snow_shot.exe", "taskkill:snow-shot-updater.exe")),
+         post=("taskkilltree:snow_shot.exe", "taskkill:snow-shot-updater.exe")),
 
     make("ticktick", "滴答清单", "效率", "https://www.ticktick.com/download",
          "TickTick", exe("TickTick.exe"),

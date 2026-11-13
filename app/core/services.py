@@ -602,10 +602,15 @@ def run_process(args: Sequence[str], *, port: ProcessPort | None = None,
     )
 
 
-def kill_process(image_name: str) -> None:
+def kill_process(image_name: str, *, tree: bool = False) -> None:
+    """Terminate a process; ``tree`` also kills the child processes it started."""
+    args = ["taskkill", "/F"]
+    if tree:
+        args.append("/T")
+    args += ["/IM", image_name]
     try:
         subprocess.run(
-            ["taskkill", "/F", "/IM", image_name],
+            args,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             timeout=30, creationflags=CREATE_NO_WINDOW, check=False,
         )
