@@ -56,7 +56,10 @@ SPECS = (
 
     make("kiro", "Kiro", "开发", "https://kiro.dev/changelog/ide", "Kiro",
          exe("Kiro.exe"),
-         regex("https://kiro.dev/downloads", r'\\"version\\":\\"([\d\.]+)'),
+         regex("https://kiro.dev/downloads",
+               r'\\"versions\\":\{[^}]*?\\"ide\\":\\"([\d.]+)'
+               "||" r'IDE ([\d.]+) release notes'
+               "||" r'kiro-ide-([\d.]+)-stable-'),
          url("https://prod.download.desktop.kiro.dev/releases/stable/win32-x64/signed/{version}/kiro-ide-{version}-stable-win32-x64.exe"),
          installer("/verysilent /mergetasks=!runcode,!desktopicon,!quicklaunchicon,!addcontextmenufiles,!addcontextmenufolders,!associatewithfiles,!addtopath"),
          post=("taskkill:Kiro.exe",)),
