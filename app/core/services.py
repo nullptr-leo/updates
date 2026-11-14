@@ -359,6 +359,37 @@ def get_file_version(exe_path: str) -> str:
     return "%d.%d.%d.%d" % get_file_version_parts(exe_path)
 
 
+def get_product_version(exe_path: str) -> str:
+    """Read ProductVersion from the localized string table.
+
+    Some installers leave the fixed FileVersion/ProductVersion fields at
+    x.y.0.0 and keep the real release version only in StringFileInfo.
+    """
+    if win32api is None:
+        raise QueryFailed("需要 pywin32 才能读取产品版本")
+    if not os.path.isfile(exe_path):
+        raise NotInstalled(f"找不到主程序: {exe_path}")
+    try:
+        translations = win32api.GetFileVersionInfo(
+            exe_path, "\\VarFileInfo\\Translation") or ()
+        for lang, codepage in translations:
+            subblock = (f"\\StringFileInfo\\{lang:04x}{codepage:04x}"
+                        "\\ProductVersion")
+            try:
+                value = win32api.GetFileVersionInfo(exe_path, subblock)
+            except Exception:
+                continue
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    except Exception:
+        pass
+    info = win32api.GetFileVersionInfo(exe_path, os.sep)
+    ms, ls = info["ProductVersionMS"], info["ProductVersionLS"]
+    return "%d.%d.%d.%d" % (
+        win32api.HIWORD(ms), win32api.LOWORD(ms),
+        win32api.HIWORD(ls), win32api.LOWORD(ls))
+
+
 def get_appx_version(package_name: str) -> str:
     try:
         from winsdk.windows.management.deployment import PackageManager  # type: ignore
@@ -392,6 +423,8 @@ def get_local_version(local: LocalSpec | None, install_dir: str = "",
         return str(fn(ctx))
     if kind == "exe":
         return get_file_version(os.path.join(install_dir, local.target))
+    if kind == "product":
+        return get_product_version(os.path.join(install_dir, local.target))
     if kind == "appx":
         return get_appx_version(local.target)
     if kind == "parts":

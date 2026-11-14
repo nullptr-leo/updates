@@ -11,8 +11,8 @@ from dataclasses import replace
 
 from ..core.models import DownloadSpec, InstallSpec, LocalSpec, RemoteSpec
 from .base import (
-    custom_remote, exe, extract, from_response, installer, make, redirect,
-    regex, url,
+    custom_remote, exe, extract, from_response, installer, make, product,
+    redirect, regex, url,
 )
 
 VOID_HEADERS = {
@@ -356,7 +356,7 @@ SPECS = (
          post=("taskkill:aDrive.exe",)),
 
     make("feishu", "飞书", "通讯", "https://www.feishu.cn/", "Feishu",
-         exe("Feishu.exe"),
+         product("Feishu.exe"),
          regex("https://www.feishu.cn/api/package_info?platform=16",
                r"Windows@V([\d\.]+)"),
          from_response("json:data.download_link"), installer(),

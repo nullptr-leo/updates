@@ -126,7 +126,7 @@ class Mode(Enum):
 class LocalSpec:
     """How to read the installed version.
 
-    kind: exe | appx | file | command | glob | parts | mtime | custom
+    kind: exe | product | appx | file | command | glob | parts | mtime | custom
     """
     kind: str = "exe"
     target: str = ""

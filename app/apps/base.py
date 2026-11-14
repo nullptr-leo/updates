@@ -10,6 +10,10 @@ def exe(target: str) -> LocalSpec:
     return LocalSpec(kind="exe", target=target)
 
 
+def product(target: str) -> LocalSpec:
+    return LocalSpec(kind="product", target=target)
+
+
 def regex(url: str, pattern: str, **kwargs) -> RemoteSpec:
     return RemoteSpec(url=url, kind="regex", pattern=pattern, **kwargs)
 
