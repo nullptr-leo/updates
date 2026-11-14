@@ -353,7 +353,7 @@ SPECS = (
          regex("https://github.com/storytold/soundcraft/releases/latest",
                r"/releases/tag/v?([\d.]+)"),
          url("https://github.com/storytold/soundcraft/releases/download/v{version}/soundcraft-{version}-windows-x64-portable.zip"),
-         extract("overwrite"),
+         extract("subdir_glob", "soundcraft-*-windows-x64-portable"),
          post=("taskkill:soundcraft.exe",)),
 
     make("deckcraft", "DeckCraft", "媒体",
@@ -362,7 +362,7 @@ SPECS = (
          regex("https://github.com/storytold/deckcraft/releases/latest",
                r"/releases/tag/v?([\d.]+)"),
          url("https://github.com/storytold/deckcraft/releases/download/v{version}/deckcraft-{version}-windows-x64-portable.zip"),
-         extract("overwrite"),
+         extract("subdir_glob", "deckcraft-*-windows-x64-portable"),
          post=("taskkill:deckcraft.exe",)),
 
     make("gridcraft", "GridCraft", "媒体",
@@ -371,7 +371,7 @@ SPECS = (
          regex("https://github.com/storytold/gridcraft/releases/latest",
                r"/releases/tag/v?([\d.]+)"),
          url("https://github.com/storytold/gridcraft/releases/download/v{version}/gridcraft-{version}-windows-x64-portable.zip"),
-         extract("overwrite"),
+         extract("subdir_glob", "gridcraft-*-windows-x64-portable"),
          post=("taskkill:gridcraft.exe",)),
 
     make("pdfcraft", "PdfCraft", "媒体",
@@ -380,7 +380,7 @@ SPECS = (
          regex("https://github.com/storytold/pdfcraft/releases/latest",
                r"/releases/tag/v?([\d.]+)"),
          url("https://github.com/storytold/pdfcraft/releases/download/v{version}/pdfcraft-{version}-windows-x64-portable.zip"),
-         extract("overwrite"),
+         extract("subdir_glob", "pdfcraft-*-windows-x64-portable"),
          post=("taskkill:pdfcraft.exe",)),
 
     make("wordcraft", "WordCraft", "媒体",
@@ -389,7 +389,7 @@ SPECS = (
          regex("https://github.com/storytold/wordcraft/releases/latest",
                r"/releases/tag/v?([\d.]+)"),
          url("https://github.com/storytold/wordcraft/releases/download/v{version}/wordcraft-{version}-windows-x64-portable.zip"),
-         extract("overwrite"),
+         extract("subdir_glob", "wordcraft-*-windows-x64-portable"),
          post=("taskkill:wordcraft.exe",)),
 
     make("vlc", "VLC", "媒体",
