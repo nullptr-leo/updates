@@ -1,4 +1,4 @@
-"""All 43 application recipes, declared as data.
+"""All 44 application recipes, declared as data.
 
 Every entry replaces one ``update-<id>.py`` script. Metadata that the legacy
 GUI scraped from source with AST/regex (install folder, homepage, whether a
@@ -387,6 +387,16 @@ SPECS = (
          post=("taskkill:QQ.exe", "open_url:https://im.qq.com/pcqq/"),
          manual_only=True,
          note="官方 CDN 拒绝直接下载，仅打开下载页"),
+
+    make("thunderbird", "Thunderbird", "通讯",
+         "https://www.thunderbird.net/zh-CN/",
+         ("Thunderbird", "Mozilla Thunderbird"),
+         LocalSpec(kind="custom", custom="thunderbird"),
+         custom_remote("thunderbird"),
+         url("https://ftp.mozilla.org/pub/thunderbird/releases/{version}/win64/zh-CN/Thunderbird%20Setup%20{version}.exe"),
+         InstallSpec(kind="custom", custom="thunderbird"),
+         post=("taskkill:thunderbird.exe",),
+         note="解压官方安装包后把 core 内文件覆盖到安装目录，不运行安装程序"),
 
     make("wecom", "企业微信", "通讯",
          "https://work.weixin.qq.com/#indexDownload",

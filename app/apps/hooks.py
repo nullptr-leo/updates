@@ -1,6 +1,6 @@
 """Custom hooks for recipes that cannot be expressed declaratively.
 
-Only 6 of 43 recipes need a custom resolver; everything else is data in
+Only a few recipes need custom resolvers; everything else is data in
 ``catalog.py``. Hooks receive a :class:`~app.core.engine.Context` facade and
 never call ``sys.exit`` / ``print``.
 """
@@ -125,6 +125,29 @@ def remote_weixin(ctx) -> RemoteInfo:
     raise QueryFailed("查询版本失败")
 
 
+THUNDERBIRD_RELEASES = "https://ftp.mozilla.org/pub/thunderbird/releases/"
+_TB_VERSION = re.compile(r"\d+(?:\.\d+)+(?:[ab]\d+)?")
+
+
+def remote_thunderbird(ctx) -> RemoteInfo:
+    """Newest version directory on Mozilla's Thunderbird releases index."""
+    text = ctx.get(THUNDERBIRD_RELEASES)
+    best: tuple[Any, str] | None = None
+    for href in re.findall(r'href="([^"]+)"', text, flags=re.I):
+        name = href.rstrip("/").rsplit("/", 1)[-1]
+        if not _TB_VERSION.fullmatch(name):
+            continue
+        try:
+            key = parse_version(name)
+        except Exception:
+            continue
+        if best is None or key > best[0]:
+            best = (key, name)
+    if best is None:
+        raise QueryFailed("查询版本失败")
+    return RemoteInfo(version=best[1], text=text)
+
+
 # --------------------------------------------------------------------------
 # local resolvers
 # --------------------------------------------------------------------------
@@ -133,6 +156,20 @@ def local_heukms(ctx) -> str:
     if not matches:
         raise NotInstalled("HEU KMS Activator 主程序不存在")
     return services.get_file_version(matches[0])
+
+
+def local_thunderbird(ctx) -> str:
+    root = ctx.install_dir()
+    for rel in (("application.ini",), ("core", "application.ini")):
+        path = os.path.join(root, *rel)
+        if not os.path.isfile(path):
+            continue
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+        match = re.search(r"^Version=([^\r\n]+)", text, flags=re.M)
+        if match:
+            return match.group(1).strip()
+    raise NotInstalled("Thunderbird 目录中找不到版本信息 (application.ini)")
 
 
 # --------------------------------------------------------------------------
@@ -149,6 +186,22 @@ def install_vlc(ctx, info: RemoteInfo, dest: str) -> None:
         target = ctx.install_dir(create=True)
         shutil.rmtree(target, ignore_errors=True)
         shutil.copytree(candidates[0], target, dirs_exist_ok=True)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def install_thunderbird(ctx, info: RemoteInfo, dest: str) -> None:
+    """Never run the installer: extract it and copy core's contents."""
+    tmp = tempfile.mkdtemp(prefix="us-thunderbird-")
+    try:
+        services.extract_archive(dest, tmp, settings=ctx.settings)
+        cores = [p for p in glob.glob(os.path.join(tmp, "**", "core"),
+                                      recursive=True)
+                 if os.path.isdir(p)]
+        if not cores:
+            raise QueryFailed("Thunderbird 安装包中未找到 core 目录")
+        target = ctx.install_dir(create=True)
+        shutil.copytree(min(cores, key=len), target, dirs_exist_ok=True)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -258,10 +311,11 @@ HOOKS: dict[str, dict[str, Any]] = {
         "qianwen": remote_qianwen,
         "vlc": remote_vlc,
         "weixin": remote_weixin,
+        "thunderbird": remote_thunderbird,
     },
-    "local": {"heukms": local_heukms},
+    "local": {"heukms": local_heukms, "thunderbird": local_thunderbird},
     "download": {},
-    "install": {"vlc": install_vlc},
+    "install": {"vlc": install_vlc, "thunderbird": install_thunderbird},
     "post": {
         "heukms_cleanup": post_heukms_cleanup,
         "weixin_cleanup": post_weixin_cleanup,
