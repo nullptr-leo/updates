@@ -306,15 +306,6 @@ class MainWindow(QMainWindow):
                    if not self.pool.is_active(s.id)]
         if not targets:
             return False
-        # An unattended sweep must never open a modal confirmation dialog.
-        if not auto and mode in (Mode.UPDATE, Mode.FORCE) and len(targets) > 1:
-            answer = QMessageBox.question(
-                self, "确认更新",
-                f"即将更新 {len(targets)} 个软件，期间会自动关闭相关程序并完成安装。\n是否继续？",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            if answer != QMessageBox.StandardButton.Yes:
-                return False
         self.model.reset_phases([s.id for s in targets])
         self._total = len(targets)
         self._done = 0
