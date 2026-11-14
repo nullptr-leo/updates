@@ -578,6 +578,16 @@ class UpdateEngine:
                                local_version=local, remote_version=remote)
                     self._install(spec, dest, info, ctx, token)
                     self._post(spec, info, ctx, token)
+                    # The installer replaced the versioned files; re-read the
+                    # installed version for the final event and the cache.
+                    try:
+                        local = self._local_version(spec, Mode.CHECK, ctx) or version
+                    except Exception as exc:
+                        self.log.info("[%s] 安装后读取本地版本失败: %s",
+                                      spec.id, exc)
+                        local = version
+                    cache.update_app_cache(spec.id, local=local, remote=remote,
+                                           needs_update=False)
                 cache.record_update_time()
                 self._send(spec, Phase.DONE, message="更新完成",
                            local_version=local, remote_version=remote,
