@@ -21,7 +21,7 @@ from .cancellation import CancellationToken
 from .config import Settings, download_dir
 from .logging_setup import get_logger
 from .models import (
-    AppSpec, Cancelled, ErrorInfo, InstallSpec, LogLevel, Mode, NotInstalled,
+    AppSpec, Cancelled, ErrorInfo, InstallSpec, Mode, NotInstalled,
     Phase, ProgressEvent, QueryFailed, RemoteInfo, RemoteSpec,
 )
 from .ports import ProcessPort, SubprocessPort
@@ -539,9 +539,7 @@ class UpdateEngine:
                         phase, message = Phase.UPTODATE, ""
                     self._send(spec, phase, message=message,
                                local_version=local, remote_version=remote,
-                               needs_update=needs, finished=True,
-                               level=(LogLevel.INFO if phase == Phase.UPTODATE
-                                      else None))
+                               needs_update=needs, finished=True)
                     return
                 if not needs:
                     self._send(spec, Phase.UPTODATE, local_version=local,

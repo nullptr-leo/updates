@@ -27,7 +27,7 @@ from ..core.config import (
     restart_command, save_settings,
 )
 from ..core.engine import UpdateEngine
-from ..core.models import ACTIVE_PHASES, AppSpec, Mode, Phase, ProgressEvent
+from ..core.models import ACTIVE_PHASES, AppSpec, LogLevel, Mode, Phase, ProgressEvent
 from ..core.registry import spec_by_id, visible_specs
 from ..workers.update_worker import TaskPool
 from .table_model import (
@@ -389,7 +389,8 @@ class MainWindow(QMainWindow):
             ("自动巡检：" if auto else "")
             + f"开始「{mode.label}」，共 {len(targets)} 个软件："
             + ", ".join(s.id for s in targets[:8])
-            + ("…" if len(targets) > 8 else "")
+            + ("…" if len(targets) > 8 else ""),
+            level=LogLevel.DEBUG,
         )
         self.pool.submit(targets, mode)
         self._update_activity()
@@ -400,7 +401,9 @@ class MainWindow(QMainWindow):
                      for i in range(self.model.rowCount())
                      if self.model.row_at(i).needs_update]
         if not updatable:
-            self.activity.append_line("尚无版本信息，先执行全量检查再选择要更新的软件")
+            self.activity.append_line(
+                "尚无版本信息，先执行全量检查再选择要更新的软件",
+                level=LogLevel.DEBUG)
             self._start(Mode.CHECK, all_visible=True)
             return
         self._start(Mode.UPDATE, updatable)

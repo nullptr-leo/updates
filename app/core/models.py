@@ -78,20 +78,20 @@ TERMINAL_PHASES = frozenset({
 SUCCESS_PHASES = frozenset({Phase.DONE, Phase.UPTODATE, Phase.DOWNLOADED})
 ERROR_PHASES = frozenset({Phase.FAILED, Phase.CANCELLED, Phase.SKIPPED})
 
-# Noisy intermediate states are DEBUG; results and problems are always visible
-# at the default INFO level.
+# Phase levels control activity-log visibility. DEBUG records are still kept
+# in the buffer and shown when the log filter is switched to "详细".
 PHASE_LOG_LEVEL: dict[Phase, LogLevel] = {
     Phase.IDLE: LogLevel.DEBUG,
     Phase.QUEUED: LogLevel.DEBUG,
     Phase.WAITING_NETWORK: LogLevel.WARNING,
     Phase.CHECKING: LogLevel.DEBUG,
-    Phase.PREPARING: LogLevel.INFO,
+    Phase.PREPARING: LogLevel.DEBUG,
     Phase.DOWNLOADING: LogLevel.DEBUG,
     Phase.INSTALLING: LogLevel.INFO,
     Phase.DONE: LogLevel.INFO,
     Phase.UPTODATE: LogLevel.DEBUG,
-    Phase.SKIPPED: LogLevel.WARNING,
-    Phase.DOWNLOADED: LogLevel.INFO,
+    Phase.SKIPPED: LogLevel.DEBUG,
+    Phase.DOWNLOADED: LogLevel.DEBUG,
     Phase.MANUAL: LogLevel.WARNING,
     Phase.FAILED: LogLevel.ERROR,
     Phase.CANCELLED: LogLevel.WARNING,

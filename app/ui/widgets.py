@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from ..core.config import Settings
 from ..core.models import AppSpec, LogLevel, ProgressEvent
+from ..core.registry import spec_by_id
 from .table_model import PROGRESS_ROLE, AppRow
 
 
@@ -341,10 +342,12 @@ class ActivityPanel(QFrame):
     def append_event(self, ev: ProgressEvent) -> None:
         stamp = time.strftime("%H:%M:%S", time.localtime(ev.timestamp))
         level = ev.effective_level
-        extra = f" — {ev.message}" if ev.message else ""
+        spec = spec_by_id(ev.app_id)
+        appname = spec.name if spec is not None else ev.app_id
+        tail = f" {ev.message}" if ev.message else ""
         self._record(
             level,
-            f"[{stamp}] [{level.label}] {ev.phase.value:<6} {ev.app_id}{extra}",
+            f"[{stamp}] [{level.label}] {appname}{tail}",
         )
 
     def append_line(self, text: str,
