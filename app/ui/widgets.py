@@ -10,9 +10,10 @@ from urllib.parse import urlsplit
 from PySide6.QtCore import QEvent, QRect, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen, QTextCursor
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
-    QFrame, QHBoxLayout, QLabel, QLineEdit, QMenu, QPlainTextEdit, QProgressBar,
-    QPushButton, QScrollArea, QSizePolicy, QSpinBox, QStyledItemDelegate,
+    QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
+    QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit, QMenu,
+    QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QSizePolicy,
+    QSpinBox, QStyle, QStyleOptionViewItem, QStyledItemDelegate,
     QVBoxLayout, QGridLayout, QWidget,
 )
 
@@ -30,6 +31,7 @@ class StatusDelegate(QStyledItemDelegate):
         value = index.data(Qt.ItemDataRole.UserRole)
         text, kind = value if isinstance(value, tuple) else (str(value or ""), "idle")
         painter.save()
+        self._paint_background(painter, option, index)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = option.rect
         progress = index.data(PROGRESS_ROLE)
@@ -44,6 +46,17 @@ class StatusDelegate(QStyledItemDelegate):
         painter.drawText(text_rect, int(Qt.AlignmentFlag.AlignVCenter |
                                         Qt.AlignmentFlag.AlignLeft), text)
         painter.restore()
+
+    def _paint_background(self, painter: QPainter, option, index) -> None:
+        """Draw the item background through the style so selection matches
+        the other cells (QSS selection-background-color applies here)."""
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        opt.text = ""
+        widget = opt.widget
+        style = widget.style() if widget is not None else QApplication.style()
+        style.drawControl(QStyle.ControlElement.CE_ItemViewItem, opt, painter,
+                          widget)
 
     def _paint_progress(self, painter: QPainter, rect: QRect,
                         percent: float) -> None:
@@ -165,9 +178,11 @@ class DetailPanel(QFrame):
         self.homepage.setWordWrap(True)
         self.info = QLabel("")
         self.info.setWordWrap(True)
+        self.info.setContentsMargins(0, 8, 0, 8)
         self.note = QLabel("")
         self.note.setWordWrap(True)
         self.note.setObjectName("Subtle")
+        self.note.setContentsMargins(0, 0, 0, 8)
         self._labels = (self.title, self.subtitle, self.homepage,
                         self.info, self.note)
         for widget in self._labels:
@@ -219,7 +234,7 @@ class DetailPanel(QFrame):
         self._set_text(self.title, spec.name)
         self._set_text(self.subtitle, f"{spec.category} · {spec.id}")
         self._set_text(self.homepage,
-                       f'<a href="{url}">{host}</a>' if url else "")
+                       f'网址：<a href="{url}">{host}</a>' if url else "")
         self.homepage.setToolTip(url)
         self._set_text(self.note, spec.note or "")
         self._buttons["download"].setEnabled(spec.downloadable)

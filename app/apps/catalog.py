@@ -68,8 +68,7 @@ SPECS = (
          exe("python.exe"),
          regex("https://www.python.org/downloads/", r"python-(.*)-amd64.exe"),
          url("https://www.python.org/ftp/python/{version}/python-{version}-amd64.exe"),
-         installer(), lexicographic=True,
-         note="官方安装器无静默参数，会显示安装界面"),
+         installer(), lexicographic=True),
 
     make("vscode", "VS Code", "开发", "https://code.visualstudio.com/",
          "Microsoft VS Code", exe("Code.exe"),
@@ -86,7 +85,7 @@ SPECS = (
                r"Windows Terminal v([\d\.]*)"),
          url("https://github.com/microsoft/terminal/releases/download/v{version}/Microsoft.WindowsTerminal_{version}_8wekyb3d8bbwe.msixbundle"),
          InstallSpec(kind="desktop"),
-         note="仅下载 msixbundle 到桌面，需手动安装"),
+         note="仅下载到桌面，需手动安装"),
 
     # ---------------------------------------------------------------- 系统
     make("autoruns", "Autoruns", "系统",
@@ -165,7 +164,7 @@ SPECS = (
          None, InstallSpec(kind="manual"),
          post=("taskkill:WinRAR.exe", "open_explorer:install_dir"),
          manual_only=True,
-         note="第三方站点仅提供版本信息，需手动下载后拖放到窗口安装"),
+         note="第三方站点，需手动下载拖放安装"),
 
     make("zyperwin", "ZyperWin++", "系统",
          "https://github.com/ZyperWave/ZyperWinOptimize/releases/latest",
@@ -187,7 +186,7 @@ SPECS = (
                "open_url:https://www.ghxi.com/beyondcompare.html",
                "open_explorer:install_dir"),
          manual_only=True, archive_handler="bcompare",
-         note="可把下载的压缩包拖入窗口自动安装"),
+         note="可拖放压缩包安装"),
 
     make("flowlauncher", "Flow Launcher", "效率",
          "https://github.com/Flow-Launcher/Flow.Launcher/releases/latest",
@@ -345,8 +344,7 @@ SPECS = (
          custom_remote("vlc"),
          url("{remote_url}"),
          InstallSpec(kind="custom", custom="vlc"),
-         post=("taskkill:vlc.exe",),
-         note="安装前会清空原安装目录，请确认无自定义配置"),
+         post=("taskkill:vlc.exe",)),
 
     # ---------------------------------------------------------------- 通讯
     make("alipan", "阿里云盘", "通讯", "https://www.alipan.com/", "aDrive",
@@ -386,7 +384,7 @@ SPECS = (
          None, InstallSpec(kind="manual"),
          post=("taskkill:QQ.exe", "open_url:https://im.qq.com/pcqq/"),
          manual_only=True,
-         note="官方 CDN 拒绝直接下载，仅打开下载页"),
+         note="仅支持跳转下载页"),
 
     make("thunderbird", "Thunderbird", "通讯",
          "https://www.thunderbird.net/zh-CN/",
@@ -395,8 +393,7 @@ SPECS = (
          custom_remote("thunderbird"),
          url("https://ftp.mozilla.org/pub/thunderbird/releases/{version}/win64/zh-CN/Thunderbird%20Setup%20{version}.exe"),
          InstallSpec(kind="custom", custom="thunderbird"),
-         post=("taskkill:thunderbird.exe",),
-         note="解压官方安装包后把 core 内文件覆盖到安装目录，不运行安装程序"),
+         post=("taskkill:thunderbird.exe",)),
 
     make("wecom", "企业微信", "通讯",
          "https://work.weixin.qq.com/#indexDownload",
@@ -414,7 +411,7 @@ SPECS = (
          None, InstallSpec(kind="manual"),
          post=("taskkill:Weixin.exe", "open_url:", "custom:weixin_cleanup"),
          manual_only=True, archive_handler="weixin",
-         note="论坛有 JS 挑战，必要时调用无头 Edge；可拖放压缩包安装"),
+         note="可拖放压缩包安装"),
 )
 
 # ------------------------------------------------------------------ proxy

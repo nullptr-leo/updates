@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import os
+import platform
 import subprocess
 import threading
+from datetime import date
 from pathlib import Path
 
+from PySide6 import __version__ as PYSIDE_VERSION
 from PySide6.QtCore import QObject, QProcess, Qt, QTimer, Signal
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDialog, QDialogButtonBox,
     QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QMainWindow,
@@ -15,6 +18,7 @@ from PySide6.QtWidgets import (
     QWidget, QFrame,
 )
 
+from .. import __version__
 from ..adapters.qt_process import QProcessPort
 from ..apps.hooks import HOOKS
 from ..core import cache, services
@@ -86,6 +90,68 @@ class IgnoredDialog(QDialog):
 
     def remaining(self) -> list[str]:
         return [self.list.item(i).text() for i in range(self.list.count())]
+
+
+class AboutDialog(QDialog):
+    """About box: full version, copyright, contact and runtime details."""
+
+    def __init__(self, version: str, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("关于 Update Scripts")
+        self.setMinimumWidth(360)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(20, 18, 20, 16)
+        root.setSpacing(10)
+
+        head = QHBoxLayout()
+        head.setSpacing(14)
+        if ICON_PATH.exists():
+            icon = QLabel()
+            icon.setPixmap(QPixmap(str(ICON_PATH)).scaled(
+                48, 48, Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation))
+            head.addWidget(icon, 0, Qt.AlignmentFlag.AlignTop)
+        titles = QVBoxLayout()
+        titles.setSpacing(2)
+        name = QLabel("Update Scripts")
+        name.setObjectName("Title")
+        build = _git_head()[:8]
+        ver = QLabel(f"版本 {version}" + (f" · 构建 {build}" if build else ""))
+        ver.setObjectName("Subtle")
+        titles.addWidget(name)
+        titles.addWidget(ver)
+        titles.addStretch(1)
+        head.addLayout(titles, 1)
+        root.addLayout(head)
+
+        root.addWidget(self._separator())
+        rights = QLabel(f"Copyright © {date.today().year}. "
+                        "All right reserved.")
+        root.addWidget(rights)
+
+        author = QLabel(
+            '作者：<a href="mailto:leo@nullptr.com.cn">leo@nullptr.com.cn</a>')
+        author.setOpenExternalLinks(True)
+        author.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextBrowserInteraction)
+        root.addWidget(author)
+
+        root.addWidget(self._separator())
+        runtime = QLabel(f"运行环境：Python {platform.python_version()}"
+                         f" · PySide6 {PYSIDE_VERSION}")
+        runtime.setObjectName("Subtle")
+        root.addWidget(runtime)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        buttons.accepted.connect(self.accept)
+        root.addWidget(buttons)
+
+    @staticmethod
+    def _separator() -> QFrame:
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setFrameShadow(QFrame.Shadow.Sunken)
+        return line
 
 
 class MainWindow(QMainWindow):
@@ -262,7 +328,7 @@ class MainWindow(QMainWindow):
         menu.addAction("打开配置文件", lambda: services.open_path(str(CONFIG_PATH)))
         menu.addAction("已忽略的软件…", self._show_ignored)
         menu.addAction("升级软件", self._self_update)
-        menu.addAction("恢复全部软件默认代理策略", self._reset_proxy_rules)
+        menu.addAction("恢复代理策略", self._reset_proxy_rules)
         menu.addSeparator()
         menu.addAction("关于", self._about)
         return menu
@@ -564,13 +630,7 @@ class MainWindow(QMainWindow):
         self.activity.append_line("设置已保存")
 
     def _about(self) -> None:
-        QMessageBox.about(
-            self, "关于 Update Scripts",
-            "Update Scripts 2.0\n\n"
-            "集中检查并升级常用软件。\n"
-            "支持定时巡检（发现更新可自动安装）、忽略不需要的软件；"
-            "关闭窗口后可继续在托盘运行。",
-        )
+        AboutDialog(__version__, self).exec()
 
     def _apply_filter(self) -> None:
         self.proxy.set_filter(self.search.text(), self.filter.currentText())
