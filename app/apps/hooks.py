@@ -122,7 +122,7 @@ def remote_weixin(ctx) -> RemoteInfo:
                 link = "https://www.52pojie.cn/" + html.unescape(match.group(1))
                 return RemoteInfo(version=match.group(2), text=text,
                                   extra={"open_url": link})
-    raise QueryFailed("未查询到微信版本（论坛可能有反爬限制）")
+    raise QueryFailed("查询版本失败")
 
 
 # --------------------------------------------------------------------------

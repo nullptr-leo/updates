@@ -207,6 +207,7 @@ class MainWindow(QMainWindow):
         for col in (C_CATEGORY, C_LOCAL, C_REMOTE, C_CHECKED):
             hh.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
         hh.setSectionResizeMode(C_STATUS, QHeaderView.ResizeMode.Stretch)
+        self.table.setColumnHidden(C_CHECKED, True)
 
         self.detail = DetailPanel()
         self.detail.actionRequested.connect(self._on_detail_action)
@@ -233,23 +234,28 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, self._tune_columns)
 
     def _tune_columns(self) -> None:
-        """Trim the 1.5x version columns to 90%; the released width goes to status."""
+        """Version columns at 81% of their tuned width; status 20% wider."""
         local = self.table.columnWidth(C_LOCAL)
         remote = self.table.columnWidth(C_REMOTE)
         status = self.table.columnWidth(C_STATUS)
         if min(local, remote, status) <= 0:
             QTimer.singleShot(50, self._tune_columns)
             return
-        local_w = int(int(local * 1.5) * 0.9)
-        remote_w = int(int(remote * 1.5) * 0.9)
+        tuned_local = int(int(local * 1.5) * 0.9)
+        tuned_remote = int(int(remote * 1.5) * 0.9)
+        # Base the status width on the tuned versions: the width trimmed from
+        # them must reach the stretching name column, not widen the status.
+        status_target = max(min(status, 140),
+                            status - (tuned_local - local) - (tuned_remote - remote))
+        version_scale = 0.9 * 0.9
+        local_w = int(tuned_local * version_scale)
+        remote_w = int(tuned_remote * version_scale)
         hh = self.table.horizontalHeader()
         for col in (C_LOCAL, C_REMOTE, C_STATUS):
             hh.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
         self.table.setColumnWidth(C_LOCAL, local_w)
         self.table.setColumnWidth(C_REMOTE, remote_w)
-        status_target = max(min(status, 140),
-                            status - (local_w - local) - (remote_w - remote))
-        self.table.setColumnWidth(C_STATUS, status_target)
+        self.table.setColumnWidth(C_STATUS, int(status_target * 1.2))
 
     def _build_more_menu(self) -> QMenu:
         menu = QMenu(self)
