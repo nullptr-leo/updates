@@ -1,4 +1,4 @@
-"""All 44 application recipes, declared as data.
+"""All 45 application recipes, declared as data.
 
 Every entry replaces one ``update-<id>.py`` script. Metadata that the legacy
 GUI scraped from source with AST/regex (install folder, homepage, whether a
@@ -337,6 +337,15 @@ SPECS = (
          custom_remote("insta360"),
          url("{remote_url}"), installer(),
          post=("taskkill:Insta360 Studio.exe",)),
+
+    make("photocraft", "PhotoCraft", "媒体",
+         "https://github.com/storytold/photocraft", r"ArtCraft\PhotoCraft",
+         exe("photocraft.exe"),
+         regex("https://github.com/storytold/photocraft/releases/latest",
+               r"/releases/tag/v?([\d.]+)"),
+         url("https://github.com/storytold/photocraft/releases/download/v{version}/photocraft-{version}-windows-x64-portable.zip"),
+         extract("overwrite"),
+         post=("taskkill:photocraft.exe",)),
 
     make("vlc", "VLC", "媒体",
          "https://artifacts.videolan.org/vlc-3.0/nightly-win64/", "VLC",
