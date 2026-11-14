@@ -253,6 +253,12 @@ class UpdateEngine:
             "{remote_version}", info.version
         )
 
+    def resolve_download_url(self, spec: AppSpec) -> str:
+        """Resolve the current download URL without running the pipeline."""
+        ctx = Context(self, spec, CancellationToken())
+        info = self._remote_info(spec, ctx)
+        return self._download_url(spec, info, ctx)
+
     def _download(self, url: str, dest: str, spec: AppSpec,
                   token: CancellationToken) -> None:
         last_emit = 0.0

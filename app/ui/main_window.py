@@ -26,6 +26,7 @@ from ..core.config import (
     CONFIG_PATH, ICON_PATH, IS_FROZEN, PROJECT_ROOT, Settings, load_settings,
     restart_command, save_settings,
 )
+from ..core.engine import UpdateEngine
 from ..core.models import ACTIVE_PHASES, AppSpec, Mode, Phase, ProgressEvent
 from ..core.registry import spec_by_id, visible_specs
 from ..workers.update_worker import TaskPool
@@ -57,6 +58,7 @@ def _git_head() -> str:
 class _AsyncSignals(QObject):
     archiveDone = Signal(bool, str)
     selfUpdateDone = Signal(bool, bool)
+    linksReady = Signal(object)
 
 
 class IgnoredDialog(QDialog):
@@ -169,6 +171,7 @@ class MainWindow(QMainWindow):
         self._async = _AsyncSignals()
         self._async.archiveDone.connect(self._on_archive_done)
         self._async.selfUpdateDone.connect(self._on_self_update_done)
+        self._async.linksReady.connect(self._on_links_ready)
 
         self.pool = TaskPool(settings, hooks=HOOKS, port=QProcessPort(), parent=self)
         self.pool.event.connect(self._on_event)
@@ -491,6 +494,8 @@ class MainWindow(QMainWindow):
             action = menu.addAction(label)
             action.triggered.connect(
                 lambda _=False, m=mode, s=list(specs): self._start(m, s))
+        menu.addAction("复制下载链接",
+                       lambda: self._copy_download_links(list(specs)))
         menu.addSeparator()
         proxy_menu = menu.addMenu("代理策略")
         rules = self.settings.proxy_rules
@@ -512,6 +517,35 @@ class MainWindow(QMainWindow):
         menu.addSeparator()
         menu.addAction("忽略", lambda: [self._ignore(s.id) for s in specs])
         menu.exec(self.table.viewport().mapToGlobal(pos))
+
+    def _copy_download_links(self, specs: list[AppSpec]) -> None:
+        self.activity.append_line("正在解析下载链接…")
+
+        def work() -> None:
+            engine = UpdateEngine(self.settings, emit=lambda ev: None,
+                                  hooks=HOOKS, wait_for_network=False)
+            links: list[str] = []
+            errors: list[str] = []
+            for spec in specs:
+                try:
+                    url = engine.resolve_download_url(spec)
+                    if url:
+                        links.append(url)
+                    else:
+                        errors.append(f"{spec.id}（无直接下载链接）")
+                except Exception as exc:
+                    errors.append(f"{spec.id}（{exc}）")
+            self._async.linksReady.emit((links, errors))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _on_links_ready(self, payload: tuple[list[str], list[str]]) -> None:
+        links, errors = payload
+        if links:
+            QGuiApplication.clipboard().setText("\n".join(links))
+            self.activity.append_line(f"已复制 {len(links)} 个下载链接到剪贴板")
+        if errors:
+            self.activity.append_line("未获取到下载链接：" + "、".join(errors))
 
     @staticmethod
     def _proxy_default_text(specs: list[AppSpec]) -> str:
