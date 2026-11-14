@@ -1,4 +1,4 @@
-"""All 45 application recipes, declared as data.
+"""All 50 application recipes, declared as data.
 
 Every entry replaces one ``update-<id>.py`` script. Metadata that the legacy
 GUI scraped from source with AST/regex (install folder, homepage, whether a
@@ -346,6 +346,51 @@ SPECS = (
          url("https://github.com/storytold/photocraft/releases/download/v{version}/photocraft-{version}-windows-x64-portable.zip"),
          extract("overwrite"),
          post=("taskkill:photocraft.exe",)),
+
+    make("soundcraft", "SoundCraft", "媒体",
+         "https://github.com/storytold/soundcraft", r"ArtCraft\SoundCraft",
+         exe("soundcraft.exe"),
+         regex("https://github.com/storytold/soundcraft/releases/latest",
+               r"/releases/tag/v?([\d.]+)"),
+         url("https://github.com/storytold/soundcraft/releases/download/v{version}/soundcraft-{version}-windows-x64-portable.zip"),
+         extract("overwrite"),
+         post=("taskkill:soundcraft.exe",)),
+
+    make("deckcraft", "DeckCraft", "媒体",
+         "https://github.com/storytold/deckcraft", r"ArtCraft\DeckCraft",
+         exe("deckcraft.exe"),
+         regex("https://github.com/storytold/deckcraft/releases/latest",
+               r"/releases/tag/v?([\d.]+)"),
+         url("https://github.com/storytold/deckcraft/releases/download/v{version}/deckcraft-{version}-windows-x64-portable.zip"),
+         extract("overwrite"),
+         post=("taskkill:deckcraft.exe",)),
+
+    make("gridcraft", "GridCraft", "媒体",
+         "https://github.com/storytold/gridcraft", r"ArtCraft\GridCraft",
+         exe("gridcraft.exe"),
+         regex("https://github.com/storytold/gridcraft/releases/latest",
+               r"/releases/tag/v?([\d.]+)"),
+         url("https://github.com/storytold/gridcraft/releases/download/v{version}/gridcraft-{version}-windows-x64-portable.zip"),
+         extract("overwrite"),
+         post=("taskkill:gridcraft.exe",)),
+
+    make("pdfcraft", "PdfCraft", "媒体",
+         "https://github.com/storytold/pdfcraft", r"ArtCraft\PdfCraft",
+         exe("pdfcraft.exe"),
+         regex("https://github.com/storytold/pdfcraft/releases/latest",
+               r"/releases/tag/v?([\d.]+)"),
+         url("https://github.com/storytold/pdfcraft/releases/download/v{version}/pdfcraft-{version}-windows-x64-portable.zip"),
+         extract("overwrite"),
+         post=("taskkill:pdfcraft.exe",)),
+
+    make("wordcraft", "WordCraft", "媒体",
+         "https://github.com/storytold/wordcraft", r"ArtCraft\WordCraft",
+         exe("wordcraft.exe"),
+         regex("https://github.com/storytold/wordcraft/releases/latest",
+               r"/releases/tag/v?([\d.]+)"),
+         url("https://github.com/storytold/wordcraft/releases/download/v{version}/wordcraft-{version}-windows-x64-portable.zip"),
+         extract("overwrite"),
+         post=("taskkill:wordcraft.exe",)),
 
     make("vlc", "VLC", "媒体",
          "https://artifacts.videolan.org/vlc-3.0/nightly-win64/", "VLC",
