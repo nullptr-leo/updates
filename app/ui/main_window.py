@@ -646,8 +646,10 @@ class MainWindow(QMainWindow):
             self._rebuild_model()
 
     def _rebuild_model(self) -> None:
-        self.model = AppTableModel(visible_specs(self.settings), self)
-        self.model.apply_cache(cache.load_cache())
+        model = AppTableModel(visible_specs(self.settings), self)
+        model.apply_cache(cache.load_cache())
+        model.adopt_state(self.model)
+        self.model = model
         self.proxy.setSourceModel(self.model)
         try:
             self.table.selectionModel().currentChanged.disconnect(self._on_selection)

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Iterable
 
 from PySide6.QtCore import (
@@ -136,6 +136,17 @@ class AppTableModel(QAbstractTableModel):
         return None
 
     # ------------------------------------------------------------- mutations
+    def adopt_state(self, previous: "AppTableModel") -> None:
+        """Carry live row state over when the model is rebuilt.
+
+        Cache data only restores versions; phases such as 已是最新 live in the
+        row itself and would otherwise fall back to 等待中.
+        """
+        old = {r.spec.id: r for r in previous._rows}
+        self._rows = [replace(old[r.spec.id]) if r.spec.id in old else r
+                      for r in self._rows]
+        self._by_id = {r.spec.id: r for r in self._rows}
+
     def row_at(self, row: int) -> AppRow:
         return self._rows[row]
 
