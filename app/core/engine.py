@@ -255,14 +255,18 @@ class UpdateEngine:
 
     def _download(self, url: str, dest: str, spec: AppSpec,
                   token: CancellationToken) -> None:
-        last_pct = -1.0
+        last_emit = 0.0
+        emit_interval = 0.2
 
         def progress(current: int, total: int) -> None:
-            nonlocal last_pct
-            pct = current * 100.0 / total if total else 0.0
-            if pct - last_pct < 1.0 and pct < 99.9:
+            # Throttle by time, not by percentage: on a slow link a 1% step
+            # of a 500MB package means several minutes without any feedback.
+            nonlocal last_emit
+            now = time.monotonic()
+            final = bool(total) and current >= total
+            if not final and now - last_emit < emit_interval:
                 return
-            last_pct = pct
+            last_emit = now
             text = (f"{current / 1048576:.1f}M/{total / 1048576:.1f}M"
                     if total else f"{current / 1048576:.1f}M")
             self._send(spec, Phase.DOWNLOADING, message=text,

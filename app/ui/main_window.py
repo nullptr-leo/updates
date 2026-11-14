@@ -419,6 +419,12 @@ class MainWindow(QMainWindow):
         if (self._auto_cycle and ev.phase == Phase.DONE
                 and ev.needs_update and ev.local_version and not ev.error):
             self._auto_update_ids.add(ev.app_id)
+        if (ev.phase == Phase.DOWNLOADING and not ev.finished
+                and not ev.error):
+            # Byte-level progress only drives the table cell; keep the log
+            # buffer, stats and detail panel free of 5Hz redraws.
+            self.model.apply_event(ev)
+            return
         self.model.apply_event(ev)
         self.activity.append_event(ev)
         index = self.model.index_of(ev.app_id)
