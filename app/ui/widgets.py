@@ -298,6 +298,7 @@ class ActivityPanel(QFrame):
         head.addWidget(title)
         head.addWidget(self.summary, 1)
         head.addWidget(self.progress, 2)
+        head.addSpacing(32)
         head.addWidget(QLabel("日志等级"))
         head.addWidget(self.level_combo)
         head.addWidget(clear)

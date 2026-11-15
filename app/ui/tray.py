@@ -8,8 +8,7 @@ from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
 class Tray(QObject):
     restoreRequested = Signal()
-    checkAllRequested = Signal()
-    updateAllRequested = Signal()
+    checkUpdateAllRequested = Signal()
     selfUpdateRequested = Signal()
     exitRequested = Signal()
 
@@ -20,8 +19,7 @@ class Tray(QObject):
         menu = QMenu()
         menu.addAction("显示窗口", self.restoreRequested.emit)
         menu.addSeparator()
-        menu.addAction("检查全部", self.checkAllRequested.emit)
-        menu.addAction("更新全部", self.updateAllRequested.emit)
+        menu.addAction("更新全部", self.checkUpdateAllRequested.emit)
         menu.addAction("升级软件", self.selfUpdateRequested.emit)
         menu.addSeparator()
         menu.addAction("退出", self.exitRequested.emit)

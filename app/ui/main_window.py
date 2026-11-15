@@ -166,6 +166,7 @@ class MainWindow(QMainWindow):
         self._done = 0
         self._total = 0
         self._auto_cycle = False
+        self._force_auto_install = False
         self._auto_update_ids: set[str] = set()
         self._columns_tuned = False
         self._async = _AsyncSignals()
@@ -229,7 +230,6 @@ class MainWindow(QMainWindow):
 
         toolbar = QHBoxLayout()
         toolbar.setSpacing(8)
-        self.check_btn = QPushButton("全部检查")
         self.update_btn = QPushButton("全部更新")
         self.update_btn.setObjectName("Primary")
         self.stop_btn = QPushButton("停止")
@@ -242,14 +242,13 @@ class MainWindow(QMainWindow):
         self.filter.addItems(["全部", "可更新", "运行中", "异常", "需手动"])
         self.settings_btn = QPushButton("设置")
         self.more_btn = QPushButton("更多")
-        self.check_btn.clicked.connect(lambda: self._start(Mode.CHECK, all_visible=True))
-        self.update_btn.clicked.connect(self._confirm_update_all)
+        self.update_btn.clicked.connect(self._check_and_update_all)
         self.stop_btn.clicked.connect(self._stop)
         self.search.textChanged.connect(self._apply_filter)
         self.filter.currentTextChanged.connect(self._apply_filter)
         self.settings_btn.clicked.connect(self._open_settings)
         self.more_btn.setMenu(self._build_more_menu())
-        for widget in (self.check_btn, self.update_btn, self.stop_btn):
+        for widget in (self.update_btn, self.stop_btn):
             toolbar.addWidget(widget)
         toolbar.addStretch(1)
         toolbar.addWidget(self.search)
@@ -339,9 +338,7 @@ class MainWindow(QMainWindow):
     def _build_tray(self) -> None:
         self.tray = Tray(str(ICON_PATH), self)
         self.tray.restoreRequested.connect(self.restore_from_tray)
-        self.tray.checkAllRequested.connect(
-            lambda: self._start(Mode.CHECK, all_visible=True))
-        self.tray.updateAllRequested.connect(self._confirm_update_all)
+        self.tray.checkUpdateAllRequested.connect(self._check_and_update_all)
         self.tray.selfUpdateRequested.connect(self._self_update)
         self.tray.exitRequested.connect(self.quit_app)
         self.tray.show()
@@ -396,17 +393,19 @@ class MainWindow(QMainWindow):
         self._update_activity()
         return True
 
-    def _confirm_update_all(self) -> None:
-        updatable = [self.model.row_at(i).spec
-                     for i in range(self.model.rowCount())
-                     if self.model.row_at(i).needs_update]
-        if not updatable:
-            self.activity.append_line(
-                "尚无版本信息，先执行全量检查再选择要更新的软件",
-                level=LogLevel.DEBUG)
-            self._start(Mode.CHECK, all_visible=True)
+    def _check_and_update_all(self) -> None:
+        """Check every visible app, then install the confirmed updates."""
+        if self.pool.active_count():
+            self.activity.append_line("上一轮任务尚未结束")
             return
-        self._start(Mode.UPDATE, updatable)
+        self._cancel_auto_cycle()
+        if not self._start(Mode.CHECK, all_visible=True):
+            return
+        # _start() clears the cycle state; arm it before any result event
+        # reaches the GUI thread so _on_idle() can chain the update sweep.
+        self._auto_cycle = True
+        self._force_auto_install = True
+        self._auto_update_ids.clear()
 
     def _stop(self) -> None:
         self._cancel_auto_cycle()
@@ -414,7 +413,6 @@ class MainWindow(QMainWindow):
         self.activity.append_line("已发送停止请求")
 
     def _set_busy(self, busy: bool) -> None:
-        self.check_btn.setEnabled(not busy)
         self.update_btn.setEnabled(not busy)
         self.stop_btn.setEnabled(busy)
 
@@ -449,12 +447,14 @@ class MainWindow(QMainWindow):
     def _on_idle(self) -> None:
         if self._auto_cycle:
             self._auto_cycle = False
+            force = self._force_auto_install
+            self._force_auto_install = False
             ids = set(self._auto_update_ids)
             self._auto_update_ids.clear()
             targets = self._auto_install_targets(ids)
             skipped = sorted(ids - {s.id for s in targets})
-            if (self.settings.schedule_enabled
-                    and self.settings.auto_install_updates):
+            if force or (self.settings.schedule_enabled
+                         and self.settings.auto_install_updates):
                 if skipped:
                     self.activity.append_line(
                         "需手动更新或无法自动安装，已跳过：" + ", ".join(skipped))
@@ -464,7 +464,8 @@ class MainWindow(QMainWindow):
                     if self._start(Mode.UPDATE, targets, auto=True):
                         return
         self._set_busy(False)
-        self.activity.append_line(f"本轮任务结束（{self._done}/{self._total}）")
+        self.activity.append_line(f"本轮任务结束（{self._done}/{self._total}）",
+                                  level=LogLevel.DEBUG)
         self.statusBar().showMessage("任务结束")
         self._update_activity()
 
@@ -741,6 +742,7 @@ class MainWindow(QMainWindow):
 
     def _cancel_auto_cycle(self) -> None:
         self._auto_cycle = False
+        self._force_auto_install = False
         self._auto_update_ids.clear()
 
     def _auto_install_targets(self, ids: set[str]) -> list[AppSpec]:
