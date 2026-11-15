@@ -1,4 +1,4 @@
-"""All 50 application recipes, declared as data.
+"""All 51 application recipes, declared as data.
 
 Every entry replaces one ``update-<id>.py`` script. Metadata that the legacy
 GUI scraped from source with AST/regex (install folder, homepage, whether a
@@ -187,6 +187,15 @@ SPECS = (
                "open_explorer:install_dir"),
          manual_only=True, archive_handler="bcompare",
          note="可拖放压缩包安装"),
+
+    make("dawnlauncher", "Dawn Launcher", "效率",
+         "https://dawnlauncher.com/zh-cn/changelog",
+         r"C:\Program Files\Dawn Launcher",
+         product("Dawn Launcher.exe"),
+         custom_remote("dawnlauncher"),
+         None, InstallSpec(kind="manual"),
+         post=("open_url:",),
+         manual_only=True),
 
     make("flowlauncher", "Flow Launcher", "效率",
          "https://github.com/Flow-Launcher/Flow.Launcher/releases/latest",

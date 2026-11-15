@@ -148,6 +148,27 @@ def remote_thunderbird(ctx) -> RemoteInfo:
     return RemoteInfo(version=best[1], text=text)
 
 
+DAWN_HOME = "https://dawnlauncher.com/"
+
+
+def remote_dawnlauncher(ctx) -> RemoteInfo:
+    """V3 Pro version and its portable download page.
+
+    The CDN link is behind a JS challenge, so the recipe only opens the page.
+    """
+    text = ctx.get(DAWN_HOME)
+    version = re.search(r'comparison-current[^>]*>v([\d.]+)', text)
+    if not version:
+        raise QueryFailed("查询版本失败")
+    anchor = text.find("version=v3-pro")
+    links = (re.findall(r'href="(https://dawnlauncher\.lanzouw\.com/[^"]+)"',
+                        text[anchor:]) if anchor >= 0 else [])
+    if len(links) < 2:
+        raise QueryFailed("查询版本失败")
+    return RemoteInfo(version=version.group(1), text=text,
+                      extra={"open_url": links[1]})
+
+
 # --------------------------------------------------------------------------
 # local resolvers
 # --------------------------------------------------------------------------
@@ -312,6 +333,7 @@ HOOKS: dict[str, dict[str, Any]] = {
         "vlc": remote_vlc,
         "weixin": remote_weixin,
         "thunderbird": remote_thunderbird,
+        "dawnlauncher": remote_dawnlauncher,
     },
     "local": {"heukms": local_heukms, "thunderbird": local_thunderbird},
     "download": {},
