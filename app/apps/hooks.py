@@ -310,6 +310,37 @@ def weixin_install(path: str, entries: list[str], settings) -> str:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+_DAWN_PORTABLE = re.compile(r"^Dawn Launcher.*Portable$", re.I)
+
+
+def dawnlauncher_match(entries: list[str]) -> bool:
+    for raw in entries:
+        name = raw.replace("\\", "/").lstrip("/")
+        first = name.split("/", 1)[0]
+        if _DAWN_PORTABLE.match(first) or name.lower() == "dawn launcher.exe":
+            return True
+    return False
+
+
+def dawnlauncher_install(path: str, entries: list[str], settings) -> str:
+    target = services.find_install_dir((r"C:\Program Files\Dawn Launcher",),
+                                       settings)
+    tmp = tempfile.mkdtemp(prefix="us-drop-")
+    try:
+        services.kill_process("Dawn Launcher.exe")
+        services.extract_archive(path, tmp, settings=settings)
+        source = tmp
+        for name in os.listdir(tmp):
+            candidate = os.path.join(tmp, name)
+            if os.path.isdir(candidate) and _DAWN_PORTABLE.match(name):
+                source = candidate
+                break
+        shutil.copytree(source, target, dirs_exist_ok=True)
+        return "Dawn Launcher"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 class _SimpleContext:
     def __init__(self, install_dir: str, settings) -> None:
         self._install_dir = install_dir
@@ -322,6 +353,8 @@ class _SimpleContext:
 ARCHIVE_HANDLERS: dict[str, dict[str, Any]] = {
     "bcompare": {"match": bcompare_match, "install": bcompare_install},
     "weixin": {"match": weixin_match, "install": weixin_install},
+    "dawnlauncher": {"match": dawnlauncher_match,
+                     "install": dawnlauncher_install},
 }
 
 HOOKS: dict[str, dict[str, Any]] = {

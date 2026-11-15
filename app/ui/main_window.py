@@ -6,7 +6,6 @@ import platform
 import subprocess
 import threading
 from datetime import date
-from pathlib import Path
 
 from PySide6 import __version__ as PYSIDE_VERSION
 from PySide6.QtCore import QObject, QProcess, Qt, QTimer, Signal
@@ -856,12 +855,6 @@ class MainWindow(QMainWindow):
             handler = HOOKS["archive"].get(spec.archive_handler) if spec.archive_handler else None
             if not handler or not handler["match"](entries):
                 continue
-            answer = QMessageBox.question(
-                self, "识别到安装包",
-                f"{Path(path).name} 匹配「{spec.name}」。\n是否解压并覆盖安装？",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-            if answer != QMessageBox.StandardButton.Yes:
-                return
             self.activity.append_line(f"拖放安装：{spec.name}")
             settings = self.settings
 
@@ -874,11 +867,13 @@ class MainWindow(QMainWindow):
 
             threading.Thread(target=work, daemon=True).start()
             return
+        supported = " / ".join(
+            s.name for s in self.model.specs() if s.archive_handler)
         QMessageBox.information(
             self, "未识别",
-            "该压缩包没有匹配到支持拖放安装的应用（Beyond Compare / 微信）。")
+            f"该压缩包没有匹配到支持拖放安装的应用（{supported}）。")
 
     def _on_archive_done(self, ok: bool, message: str) -> None:
         self.activity.append_line(message)
-        (QMessageBox.information if ok else QMessageBox.warning)(
-            self, "拖放安装", message)
+        if not ok:
+            QMessageBox.warning(self, "拖放安装", message)

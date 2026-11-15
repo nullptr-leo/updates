@@ -195,7 +195,8 @@ SPECS = (
          custom_remote("dawnlauncher"),
          None, InstallSpec(kind="manual"),
          post=("open_url:",),
-         manual_only=True),
+         manual_only=True, archive_handler="dawnlauncher",
+         note="可拖放压缩包安装"),
 
     make("flowlauncher", "Flow Launcher", "效率",
          "https://github.com/Flow-Launcher/Flow.Launcher/releases/latest",
