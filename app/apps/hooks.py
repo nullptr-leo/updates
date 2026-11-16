@@ -270,7 +270,7 @@ def bcompare_match(entries: list[str]) -> bool:
 
 
 def bcompare_install(path: str, entries: list[str], settings) -> str:
-    target = services.find_install_dir(("Beyond Compare",), settings)
+    target = services.find_install_dir(("Beyond Compare",), settings, create=True)
     tmp = tempfile.mkdtemp(prefix="us-drop-")
     try:
         services.kill_process("BCompare.exe")
@@ -296,7 +296,7 @@ def weixin_match(entries: list[str]) -> bool:
 
 
 def weixin_install(path: str, entries: list[str], settings) -> str:
-    target = services.find_install_dir((r"Tencent\Weixin",), settings)
+    target = services.find_install_dir((r"Tencent\Weixin",), settings, create=True)
     tmp = tempfile.mkdtemp(prefix="us-drop-")
     try:
         services.kill_process("Weixin.exe")
@@ -324,7 +324,7 @@ def dawnlauncher_match(entries: list[str]) -> bool:
 
 def dawnlauncher_install(path: str, entries: list[str], settings) -> str:
     target = services.find_install_dir((r"C:\Program Files\Dawn Launcher",),
-                                       settings)
+                                       settings, create=True)
     tmp = tempfile.mkdtemp(prefix="us-drop-")
     try:
         services.kill_process("Dawn Launcher.exe")
