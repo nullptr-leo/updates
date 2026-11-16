@@ -7,7 +7,8 @@ from dataclasses import dataclass, replace
 from typing import Any, Iterable
 
 from PySide6.QtCore import (
-    QAbstractTableModel, QModelIndex, QSortFilterProxyModel, Qt,
+    QAbstractTableModel, QCollator, QLocale, QModelIndex,
+    QSortFilterProxyModel, Qt,
 )
 from PySide6.QtGui import QColor
 
@@ -228,7 +229,17 @@ class AppFilterProxyModel(QSortFilterProxyModel):
         super().__init__(parent)
         self._text = ""
         self._kind = "全部"
+        self._collator = QCollator(QLocale("zh_CN"))
+        self._collator.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self._collator.setNumericMode(True)
         self.setDynamicSortFilter(True)
+
+    def lessThan(self, left: QModelIndex, right: QModelIndex) -> bool:
+        if left.column() != C_NAME:
+            return super().lessThan(left, right)
+        lhs = str(left.data(Qt.ItemDataRole.DisplayRole) or "")
+        rhs = str(right.data(Qt.ItemDataRole.DisplayRole) or "")
+        return self._collator.compare(lhs, rhs) < 0
 
     def set_filter(self, text: str, kind: str) -> None:
         self._text = text.strip().lower()
