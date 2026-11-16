@@ -52,7 +52,7 @@ class LogLevel(IntEnum):
 
 class Phase(Enum):
     IDLE = "等待中"
-    QUEUED = "排队中"
+    QUEUED = "等待中"
     WAITING_NETWORK = "等待连接"
     CHECKING = "检查中"
     PREPARING = "准备中"

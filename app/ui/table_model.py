@@ -1,6 +1,7 @@
 """Model/View table. Replaces linear scans over a ttk.Treeview."""
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass, replace
 from typing import Any, Iterable
@@ -44,7 +45,12 @@ class AppRow:
     @property
     def status_text(self) -> str:
         if self.phase == Phase.FAILED:
-            return f"失败: {self.message}" if self.message else "失败"
+            if not self.message:
+                return "失败"
+            # Keep the status cell short; the full text stays in the activity
+            # log and in the cell tooltip.
+            brief = re.split(r"[:：]", self.message, maxsplit=1)[0]
+            return f"失败: {brief}"
         if self.phase == Phase.SKIPPED:
             return "未安装"
         if self.phase == Phase.CANCELLED:
@@ -59,6 +65,8 @@ class AppRow:
 
     @property
     def status_kind(self) -> str:
+        if self.phase == Phase.SKIPPED:
+            return "idle"
         if self.phase in ERROR_PHASES:
             return "error"
         if self.phase in (Phase.MANUAL, Phase.WAITING_NETWORK):
@@ -239,7 +247,7 @@ class AppFilterProxyModel(QSortFilterProxyModel):
             return False
         if kind == "运行中" and row.phase not in ACTIVE_PHASES:
             return False
-        if kind == "异常" and row.phase not in ERROR_PHASES:
+        if kind == "异常" and row.status_kind != "error":
             return False
         if kind == "需手动" and not row.spec.manual_only:
             return False

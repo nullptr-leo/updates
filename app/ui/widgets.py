@@ -12,7 +12,7 @@ from PySide6.QtGui import QBrush, QColor, QPainter, QPen, QTextCursor
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
     QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit, QMenu,
-    QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QSizePolicy,
+    QPlainTextEdit, QPushButton, QScrollArea, QSizePolicy,
     QSpinBox, QStyle, QStyleOptionViewItem, QStyledItemDelegate,
     QVBoxLayout, QGridLayout, QWidget,
 )
@@ -21,6 +21,7 @@ from ..core.config import Settings
 from ..core.models import AppSpec, LogLevel, ProgressEvent
 from ..core.registry import spec_by_id
 from .table_model import PROGRESS_ROLE, AppRow
+from .theme import palette
 
 
 class StatusDelegate(QStyledItemDelegate):
@@ -81,6 +82,62 @@ class StatusDelegate(QStyledItemDelegate):
             painter.setBrush(QBrush(edge))
             painter.drawRoundedRect(
                 QRect(bar.left() + width - 2, bar.top(), 2, bar.height()), 1, 1)
+
+
+class ProgressBadge(QWidget):
+    """Rounded progress track with the value drawn on top, like status cells."""
+
+    def __init__(self, colors: dict[str, str], parent=None) -> None:
+        super().__init__(parent)
+        self._colors = colors
+        self._done = 0
+        self._total = 0
+        self.setFixedHeight(22)
+
+    def set_colors(self, colors: dict[str, str]) -> None:
+        self._colors = colors
+        self.update()
+
+    def set_progress(self, done: int, total: int) -> None:
+        self._done, self._total = done, total
+        self.update()
+
+    def text(self) -> str:
+        return f"{self._done}/{self._total}" if self._total else "就绪"
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        rect = self.rect().adjusted(0, 3, -1, 0)
+        if rect.width() <= 0 or rect.height() <= 0:
+            return
+        percent = min(100.0, self._done * 100.0 / self._total) if self._total else 0.0
+        running = self._colors.get("running", "#2563eb")
+        painter.setPen(Qt.PenStyle.NoPen)
+        track = QColor(running)
+        track.setAlpha(14)
+        painter.setBrush(QBrush(track))
+        painter.drawRoundedRect(rect, 4, 4)
+        width = int(rect.width() * max(3.0, percent) / 100.0) if percent else 0
+        if width:
+            fill = QColor(running)
+            fill.setAlpha(46)
+            painter.setBrush(QBrush(fill))
+            painter.drawRoundedRect(
+                QRect(rect.left(), rect.top(), width, rect.height()), 4, 4)
+            if width > 6:
+                edge = QColor(running)
+                edge.setAlpha(120)
+                painter.setBrush(QBrush(edge))
+                painter.drawRoundedRect(
+                    QRect(rect.left() + width - 2, rect.top(), 2,
+                          rect.height()), 1, 1)
+        text = self.text()
+        if text:
+            painter.setPen(QPen(QColor(self._colors.get("text", "#1f2328"))))
+            painter.drawText(
+                rect, int(Qt.AlignmentFlag.AlignVCenter |
+                          Qt.AlignmentFlag.AlignCenter), text)
 
 
 class _DetailScrollArea(QScrollArea):
@@ -279,13 +336,9 @@ class ActivityPanel(QFrame):
         root = QVBoxLayout(self)
         root.setContentsMargins(12, 10, 12, 10)
         head = QHBoxLayout()
-        title = QLabel("活动")
+        title = QLabel("输出")
         title.setObjectName("Title")
-        self.summary = QLabel("就绪")
-        self.summary.setObjectName("Subtle")
-        self.progress = QProgressBar()
-        self.progress.setFixedHeight(8)
-        self.progress.setTextVisible(False)
+        self.progress = ProgressBadge(palette("light"), self)
         self.level_combo = QComboBox()
         for level, label in self.LEVEL_CHOICES:
             self.level_combo.addItem(label, int(level))
@@ -297,9 +350,9 @@ class ActivityPanel(QFrame):
         clear.clicked.connect(self.clear_log)
         export.clicked.connect(self.export_log)
         head.addWidget(title)
-        head.addWidget(self.summary, 1)
-        head.addWidget(self.progress, 2)
-        head.addSpacing(32)
+        head.addSpacing(12)
+        head.addWidget(self.progress, 1)
+        head.addSpacing(12)
         head.addWidget(QLabel("日志等级"))
         head.addWidget(self.level_combo)
         head.addWidget(clear)
@@ -357,14 +410,11 @@ class ActivityPanel(QFrame):
         stamp = time.strftime("%H:%M:%S")
         self._record(level, f"[{stamp}] [{level.label}] {text}")
 
-    def set_progress(self, done: int, total: int, active: int,
-                     concurrency: int) -> None:
-        self.progress.setRange(0, max(1, total))
-        self.progress.setValue(done)
-        self.summary.setText(
-            f"整体 {done}/{total} · 同时进行 {active}/{concurrency}" if total
-            else f"就绪 · 同时最多处理 {concurrency} 个"
-        )
+    def set_colors(self, colors: dict[str, str]) -> None:
+        self.progress.set_colors(colors)
+
+    def set_progress(self, done: int, total: int) -> None:
+        self.progress.set_progress(done, total)
 
     # ------------------------------------------------------------ actions
     def _show_log_menu(self, pos) -> None:

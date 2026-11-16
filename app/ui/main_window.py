@@ -698,6 +698,7 @@ class MainWindow(QMainWindow):
         colors = palette(resolved)
         self._status_delegate = StatusDelegate(colors, self.table)
         self.table.setItemDelegateForColumn(C_STATUS, self._status_delegate)
+        self.activity.set_colors(colors)
 
     def _update_stats(self) -> None:
         rows = [self.model.row_at(i) for i in range(self.model.rowCount())]
@@ -709,9 +710,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"上次更新：{cache.last_update_time()}")
 
     def _update_activity(self) -> None:
-        self.activity.set_progress(self._done, self._total,
-                                   self.pool.active_count(),
-                                   self.settings.concurrency)
+        self.activity.set_progress(self._done, self._total)
 
     # ------------------------------------------------------ tray / schedule
     def restore_from_tray(self) -> None:
