@@ -140,7 +140,8 @@ class DetailPanel(QFrame):
     actionRequested = Signal(str, str)
 
     ACTIONS = (
-        ("check", "检查更新"), ("update", "更新"), ("force", "强制更新"),
+        ("update", "检查更新"), ("check", "检查远程版本"),
+        ("force", "强制更新"),
         ("download", "仅下载安装包"), ("open_exe", "打开程序"),
         ("open_dir", "打开程序目录"), ("open_home", "打开软件主页"),
         ("ignore", "忽略此软件"),
