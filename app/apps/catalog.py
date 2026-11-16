@@ -213,7 +213,7 @@ SPECS = (
          regex("https://github.com/builtbybel/FluentCleaner/releases/latest",
                r"FluentCleaner ([\d\.]*)"),
          url("https://github.com/builtbybel/FluentCleaner/releases/download/{version}/FluentCleaner-win-x64.zip"),
-         extract("overwrite"),
+         extract("subdir_glob", "FluentCleaner-win-x64"),
          post=("taskkill:FCleaner.exe",)),
 
     make("gety", "Gety", "效率", "https://gety.ai/zh/changelog/", "Gety",
