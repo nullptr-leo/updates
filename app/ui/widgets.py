@@ -473,7 +473,7 @@ class SettingsDialog(QDialog):
         self.minutes.setRange(5, 1440)
         self.minutes.setSuffix(" 分钟")
         self.minutes.setValue(settings.schedule_minutes)
-        self.run_on_start = QCheckBox("启动时立即巡检一次")
+        self.run_on_start = QCheckBox("启动时立即检查更新")
         self.run_on_start.setChecked(settings.run_on_start)
         self.tray = QCheckBox("关闭窗口时最小化到托盘")
         self.tray.setChecked(settings.minimize_to_tray)
@@ -488,7 +488,7 @@ class SettingsDialog(QDialog):
         form.addRow("仅下载保存目录", self.download_dir)
         form.addRow("", self.schedule)
         form.addRow("", self.auto_install)
-        form.addRow("巡检间隔", self.minutes)
+        form.addRow("检查更新间隔", self.minutes)
         form.addRow("", self.run_on_start)
         form.addRow("", self.tray)
 
