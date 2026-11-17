@@ -90,6 +90,8 @@ class Settings:
     proxy_rules: dict[str, str] = field(default_factory=dict)
     verify_tls: bool = True
     minimize_to_tray: bool = True
+    sort_column: int = 0
+    sort_desc: bool = True
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -116,6 +118,11 @@ class Settings:
             cfg.proxy_rules = {}
         cfg.concurrency = max(1, min(16, int(cfg.concurrency)))
         cfg.schedule_minutes = max(5, int(cfg.schedule_minutes))
+        try:
+            cfg.sort_column = max(0, min(5, int(cfg.sort_column)))
+        except (TypeError, ValueError):
+            cfg.sort_column = 0
+        cfg.sort_desc = bool(cfg.sort_desc)
         return cfg
 
 

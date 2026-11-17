@@ -196,6 +196,7 @@ class MainWindow(QMainWindow):
         self._total = 0
         self._taskbar = _TaskbarProgress()
         self._columns_tuned = False
+        self._restoring_sort = False
         self._async = _AsyncSignals()
         self._async.archiveDone.connect(self._on_archive_done)
         self._async.selfUpdateDone.connect(self._on_self_update_done)
@@ -303,6 +304,8 @@ class MainWindow(QMainWindow):
             hh.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
         hh.setSectionResizeMode(C_STATUS, QHeaderView.ResizeMode.Stretch)
         self.table.setColumnHidden(C_CHECKED, True)
+        hh.sortIndicatorChanged.connect(self._on_sort_changed)
+        self._restore_sort()
 
         self.detail = DetailPanel()
         self.detail.actionRequested.connect(self._on_detail_action)
@@ -680,6 +683,25 @@ class MainWindow(QMainWindow):
 
     def _apply_filter(self) -> None:
         self.proxy.set_filter(self.search.text(), self.filter.currentText())
+
+    def _restore_sort(self) -> None:
+        column = self.settings.sort_column
+        if not 0 <= column < self.proxy.columnCount():
+            column = C_NAME
+        order = (Qt.SortOrder.DescendingOrder if self.settings.sort_desc
+                 else Qt.SortOrder.AscendingOrder)
+        self._restoring_sort = True
+        try:
+            self.table.sortByColumn(column, order)
+        finally:
+            self._restoring_sort = False
+
+    def _on_sort_changed(self, column: int, order: Qt.SortOrder) -> None:
+        if self._restoring_sort:
+            return
+        self.settings.sort_column = column
+        self.settings.sort_desc = order == Qt.SortOrder.DescendingOrder
+        save_settings(self.settings)
 
     def _resolve_theme(self, theme: str) -> str:
         if theme != "system":
