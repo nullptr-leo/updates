@@ -164,9 +164,6 @@ class MainWindow(QMainWindow):
         self._force_quit = False
         self._done = 0
         self._total = 0
-        self._auto_cycle = False
-        self._force_auto_install = False
-        self._auto_update_ids: set[str] = set()
         self._columns_tuned = False
         self._async = _AsyncSignals()
         self._async.archiveDone.connect(self._on_archive_done)
@@ -371,8 +368,6 @@ class MainWindow(QMainWindow):
 
     def _start(self, mode: Mode, specs: list[AppSpec] | None = None,
                all_visible: bool = False, *, auto: bool = False) -> bool:
-        if not auto:
-            self._cancel_auto_cycle()
         targets = [s for s in self._specs_for(mode, specs, all_visible)
                    if not self.pool.is_active(s.id)]
         if not targets:
@@ -392,22 +387,25 @@ class MainWindow(QMainWindow):
         self._update_activity()
         return True
 
+    def _start_update_all(self, *, auto: bool = False) -> None:
+        specs = self.model.specs()
+        skipped = [s.id for s in specs if not s.auto_installable]
+        if skipped:
+            self.activity.append_line(
+                "需手动更新或无法自动安装，已跳过：" + ", ".join(skipped),
+                level=LogLevel.DEBUG,
+            )
+        self._start(Mode.UPDATE, [s for s in specs if s.auto_installable],
+                    auto=auto)
+
     def _check_and_update_all(self) -> None:
-        """Check every visible app, then install the confirmed updates."""
+        """Check and update every auto-installable visible app in one sweep."""
         if self.pool.active_count():
             self.activity.append_line("上一轮任务尚未结束")
             return
-        self._cancel_auto_cycle()
-        if not self._start(Mode.CHECK, all_visible=True):
-            return
-        # _start() clears the cycle state; arm it before any result event
-        # reaches the GUI thread so _on_idle() can chain the update sweep.
-        self._auto_cycle = True
-        self._force_auto_install = True
-        self._auto_update_ids.clear()
+        self._start_update_all()
 
     def _stop(self) -> None:
-        self._cancel_auto_cycle()
         self.pool.cancel_all()
         self.activity.append_line("已发送停止请求")
 
@@ -417,11 +415,6 @@ class MainWindow(QMainWindow):
 
     # --------------------------------------------------------------- events
     def _on_event(self, ev: ProgressEvent) -> None:
-        # Only apps freshly confirmed updatable by this sweep may be installed;
-        # a stale cache entry or a failed check must never trigger an install.
-        if (self._auto_cycle and ev.phase == Phase.DONE
-                and ev.needs_update and ev.local_version and not ev.error):
-            self._auto_update_ids.add(ev.app_id)
         if (ev.phase == Phase.DOWNLOADING and not ev.finished
                 and not ev.error):
             # Byte-level progress only drives the table cell; keep the log
@@ -444,24 +437,6 @@ class MainWindow(QMainWindow):
         self._update_activity()
 
     def _on_idle(self) -> None:
-        if self._auto_cycle:
-            self._auto_cycle = False
-            force = self._force_auto_install
-            self._force_auto_install = False
-            ids = set(self._auto_update_ids)
-            self._auto_update_ids.clear()
-            targets = self._auto_install_targets(ids)
-            skipped = sorted(ids - {s.id for s in targets})
-            if force or (self.settings.schedule_enabled
-                         and self.settings.auto_install_updates):
-                if skipped:
-                    self.activity.append_line(
-                        "需手动更新或无法自动安装，已跳过：" + ", ".join(skipped))
-                if targets:
-                    self.activity.append_line(
-                        f"检查到 {len(targets)} 个更新，开始自动安装")
-                    if self._start(Mode.UPDATE, targets, auto=True):
-                        return
         self._set_busy(False)
         self.activity.append_line(f"本轮任务结束（{self._done}/{self._total}）",
                                   level=LogLevel.DEBUG)
@@ -725,7 +700,7 @@ class MainWindow(QMainWindow):
         QApplication.instance().quit()
 
     def _scheduled_cycle(self) -> None:
-        """One scheduled/startup sweep: check, then install confirmed updates."""
+        """One scheduled/startup sweep: check only, or update directly."""
         if self.pool.active_count():
             self.activity.append_line("上一轮巡检尚未结束，跳过本次定时任务")
             return
@@ -733,23 +708,7 @@ class MainWindow(QMainWindow):
                 and self.settings.auto_install_updates):
             self._start(Mode.CHECK, all_visible=True, auto=True)
             return
-        self._auto_cycle = True
-        self._auto_update_ids.clear()
-        if not self._start(Mode.CHECK, all_visible=True, auto=True):
-            self._auto_cycle = False
-
-    def _cancel_auto_cycle(self) -> None:
-        self._auto_cycle = False
-        self._force_auto_install = False
-        self._auto_update_ids.clear()
-
-    def _auto_install_targets(self, ids: set[str]) -> list[AppSpec]:
-        targets = []
-        for i in range(self.model.rowCount()):
-            spec = self.model.row_at(i).spec
-            if spec.id in ids and spec.auto_installable:
-                targets.append(spec)
-        return targets
+        self._start_update_all(auto=True)
 
     def _apply_schedule(self) -> None:
         if not hasattr(self, "_scheduler"):
