@@ -456,11 +456,11 @@ class SettingsDialog(QDialog):
         self.proxy.setPlaceholderText("例如 http://127.0.0.1:7890，留空则不使用代理")
         self.verify = QCheckBox("校验 HTTPS 证书")
         self.verify.setChecked(settings.verify_tls)
-        self.schedule = QCheckBox("启用定时检查")
+        self.schedule = QCheckBox("启用定时检查更新")
         self.schedule.setChecked(settings.schedule_enabled)
         self.auto_install = QCheckBox("检查到更新后自动安装")
         self.auto_install.setToolTip(
-            "定时巡检与启动巡检均适用：发现更新后自动下载并安装，"
+            "定时检查更新与启动检查更新均适用：发现更新后自动下载并安装，"
             "必要时自动关闭相关程序。\n"
             "需手动更新或未安装的软件会被跳过；个别无静默参数的"
             "安装器仍可能弹出安装界面，需要人工确认。")

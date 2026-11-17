@@ -195,8 +195,8 @@ class MainWindow(QMainWindow):
         self._update_activity()
         self.activity.append_line(f"已加载 {self.model.rowCount()} 个软件")
 
-        if settings.run_on_start or settings.schedule_enabled:
-            QTimer.singleShot(900, self._scheduled_cycle)
+        if settings.run_on_start:
+            QTimer.singleShot(900, self._run_cycle)
 
     # ------------------------------------------------------------------ UI
     def _build_ui(self) -> None:
@@ -377,7 +377,7 @@ class MainWindow(QMainWindow):
         self._done = 0
         self._set_busy(True)
         self.activity.append_line(
-            ("自动巡检：" if auto else "")
+            ("自动检查更新：" if auto else "")
             + f"开始「{mode.label}」，共 {len(targets)} 个软件："
             + ", ".join(s.id for s in targets[:8])
             + ("…" if len(targets) > 8 else ""),
@@ -699,21 +699,20 @@ class MainWindow(QMainWindow):
         self.pool.wait_for_done(1500)
         QApplication.instance().quit()
 
-    def _scheduled_cycle(self) -> None:
-        """One scheduled/startup sweep: check only, or update directly."""
+    def _run_cycle(self) -> None:
+        """One check/update sweep, triggered by startup or the schedule."""
         if self.pool.active_count():
-            self.activity.append_line("上一轮巡检尚未结束，跳过本次定时任务")
+            self.activity.append_line("上一轮检查更新尚未结束，跳过本次")
             return
-        if not (self.settings.schedule_enabled
-                and self.settings.auto_install_updates):
+        if self.settings.auto_install_updates:
+            self._start_update_all(auto=True)
+        else:
             self._start(Mode.CHECK, all_visible=True, auto=True)
-            return
-        self._start_update_all(auto=True)
 
     def _apply_schedule(self) -> None:
         if not hasattr(self, "_scheduler"):
             self._scheduler = QTimer(self)
-            self._scheduler.timeout.connect(self._scheduled_cycle)
+            self._scheduler.timeout.connect(self._run_cycle)
         if self.settings.schedule_enabled:
             self._scheduler.start(self.settings.schedule_minutes * 60 * 1000)
         else:
