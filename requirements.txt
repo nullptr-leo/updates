@@ -7,6 +7,7 @@ requests[socks]>=2.31
 packaging>=23.0
 pywin32>=306; sys_platform == "win32"
 py7zr>=0.20; sys_platform == "win32"
+PyTaskbar>=0.1.1; sys_platform == "win32"
 
 # Optional runtime extras - imported lazily, only needed by specific recipes.
 # Uncomment the ones you need:

@@ -47,9 +47,16 @@ def main() -> int:
         "PySide6.QtNetwork",
         # Used lazily to read Windows' Internet connectivity state.
         "pythoncom", "win32com.client",
+        # PyTaskbar builds its COM wrapper from TaskbarLib.tlb at import time.
+        "PyTaskbar", "comtypes", "comtypes.client", "comtypes.gen.TaskbarLib",
     ):
         if available(module):
             args += ["--hidden-import", module]
+    taskbar_spec = importlib.util.find_spec("PyTaskbar") if available("PyTaskbar") else None
+    if taskbar_spec and taskbar_spec.submodule_search_locations:
+        tlb = Path(next(iter(taskbar_spec.submodule_search_locations))) / "TaskbarLib.tlb"
+        if tlb.is_file():
+            args += ["--add-data", f"{tlb}{SEP}PyTaskbar"]
     args.append(str(ROOT / "main.pyw"))
 
     print("输出:", ROOT / "dist" / "UpdateScripts.exe")

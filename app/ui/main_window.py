@@ -40,6 +40,12 @@ from .widgets import (
     ActivityPanel, DetailPanel, SettingsDialog, StatusDelegate,
 )
 
+try:
+    from PyTaskbar import ProgressType, TaskbarProgress as _TaskbarBackend
+except Exception:
+    ProgressType = None
+    _TaskbarBackend = None
+
 
 def _git_head() -> str:
     """Current HEAD hash, or "" when git metadata is unavailable."""
@@ -59,6 +65,29 @@ class _AsyncSignals(QObject):
     archiveDone = Signal(bool, str, str, str)
     selfUpdateDone = Signal(bool, bool)
     linksReady = Signal(object)
+
+
+class _TaskbarProgress:
+    """Thin PyTaskbar wrapper: lazy per-window backend, failure-safe."""
+
+    def __init__(self) -> None:
+        self._backend = None
+        self._hwnd = 0
+
+    def set_progress(self, hwnd: int, done: int, total: int) -> None:
+        if _TaskbarBackend is None or not hwnd:
+            return
+        try:
+            if self._backend is None or self._hwnd != hwnd:
+                self._backend = _TaskbarBackend(hwnd)
+                self._hwnd = hwnd
+            if total > 0 and done < total:
+                self._backend.set_progress(done, total)
+                self._backend.set_progress_type(ProgressType.NORMAL)
+            else:
+                self._backend.set_progress_type(ProgressType.NOPROGRESS)
+        except Exception:
+            pass
 
 
 class IgnoredDialog(QDialog):
@@ -165,6 +194,7 @@ class MainWindow(QMainWindow):
         self._force_quit = False
         self._done = 0
         self._total = 0
+        self._taskbar = _TaskbarProgress()
         self._columns_tuned = False
         self._async = _AsyncSignals()
         self._async.archiveDone.connect(self._on_archive_done)
@@ -690,12 +720,15 @@ class MainWindow(QMainWindow):
 
     def _update_activity(self) -> None:
         self.activity.set_progress(self._done, self._total)
+        if self._total:
+            self._taskbar.set_progress(int(self.winId()), self._done, self._total)
 
     # ------------------------------------------------------ tray / schedule
     def restore_from_tray(self) -> None:
         self.showNormal()
         self.raise_()
         self.activateWindow()
+        self._update_activity()
 
     def quit_app(self) -> None:
         self._force_quit = True
