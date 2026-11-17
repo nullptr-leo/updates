@@ -323,7 +323,7 @@ SPECS = (
          "WorkBuddy", exe("WorkBuddy.exe"),
          RemoteSpec(url="https://www.workbuddy.cn/v2/update?platform=workbuddy-win32-x64-user",
                     kind="json", pattern="version", transform="strip_last"),
-         from_response("json:url"), installer(),
+         from_response("json:url"), extract(),
          post=("taskkill:WorkBuddy.exe", "shortcut:WorkBuddy",
                r"regdel:HKEY_CLASSES_ROOT\Directory\background\shell\WorkBuddy")),
 
