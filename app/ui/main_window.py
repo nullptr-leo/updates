@@ -386,7 +386,7 @@ class MainWindow(QMainWindow):
                    all_visible: bool) -> list[AppSpec]:
         if all_visible:
             return self.model.specs()
-        if specs:
+        if specs is not None:
             return specs
         current = self.table.selectionModel().currentIndex()
         if current.isValid():
@@ -422,18 +422,10 @@ class MainWindow(QMainWindow):
         return True
 
     def _start_update_all(self, *, auto: bool = False) -> None:
-        specs = self.model.specs()
-        skipped = [s.id for s in specs if not s.auto_installable]
-        if skipped:
-            self.activity.append_line(
-                "需手动更新或无法自动安装，已跳过：" + ", ".join(skipped),
-                level=LogLevel.DEBUG,
-            )
-        self._start(Mode.UPDATE, [s for s in specs if s.auto_installable],
-                    auto=auto)
+        self._start(Mode.UPDATE, all_visible=True, auto=auto)
 
     def _check_and_update_all(self) -> None:
-        """Check and update every auto-installable visible app in one sweep."""
+        """Check and update every visible app in one sweep."""
         if self.pool.active_count():
             self.activity.append_line("上一轮任务尚未结束")
             return
