@@ -65,6 +65,15 @@ SPECS = (
          installer("/verysilent /mergetasks=!runcode,!desktopicon,!quicklaunchicon,!addcontextmenufiles,!addcontextmenufolders,!associatewithfiles,!addtopath"),
          post=("taskkill:Kiro.exe",)),
 
+    make("powershell", "PowerShell", "开发",
+         "https://github.com/PowerShell/powershell",
+         r"C:\Program Files\PowerShell\7", exe("pwsh.exe"),
+         regex("https://github.com/PowerShell/powershell/releases/latest",
+               r"/releases/tag/v([\d.]+)"),
+         url("https://github.com/PowerShell/PowerShell/releases/download/v{version}/PowerShell-{version}-win-x64.zip"),
+         extract("overwrite"),
+         post=("taskkill:pwsh.exe", "path:self")),
+
     make("python", "Python", "开发", "https://www.python.org/downloads/", "Python",
          exe("python.exe"),
          regex("https://www.python.org/downloads/", r"python-(.*)-amd64.exe"),
