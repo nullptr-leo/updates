@@ -1,5 +1,7 @@
 """Two compact QSS themes. No third-party widget library required."""
 
+from ..core.config import ASSETS_DIR
+
 LIGHT_QSS = """
 QWidget { font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif; font-size: 13px; color: #1f2328; }
 QMainWindow, QDialog { background: #f6f7f9; }
@@ -87,7 +89,53 @@ PALETTE = {
 
 
 def stylesheet(theme: str) -> str:
-    return DARK_QSS if theme == "dark" else LIGHT_QSS
+    dark = theme == "dark"
+    base = DARK_QSS if dark else LIGHT_QSS
+    suffix = "dark" if dark else "light"
+    down = ASSETS_DIR.joinpath(f"chevron-down-{suffix}.svg").as_posix()
+    up = ASSETS_DIR.joinpath(f"chevron-up-{suffix}.svg").as_posix()
+    popup_bg = "#232a33" if dark else "#ffffff"
+    popup_border = "#343d48" if dark else "#d5d9df"
+    popup_sel = "#2c3f5e" if dark else "#e8f0fe"
+    popup_text = "#e6e8eb" if dark else "#111418"
+    return base + f"""
+QComboBox {{ padding-right: 30px; }}
+QComboBox::drop-down {{
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 26px;
+    border: none;
+    background: transparent;
+}}
+QComboBox::down-arrow {{
+    image: url("{down}");
+    width: 14px;
+    height: 14px;
+}}
+QComboBox QAbstractItemView {{
+    background: {popup_bg};
+    border: 1px solid {popup_border};
+    border-radius: 7px;
+    padding: 4px;
+    selection-background-color: {popup_sel};
+    selection-color: {popup_text};
+}}
+QSpinBox {{ padding-right: 24px; }}
+QSpinBox::up-button, QSpinBox::down-button {{
+    subcontrol-origin: padding;
+    width: 20px;
+    border: none;
+    background: transparent;
+}}
+QSpinBox::up-button {{ subcontrol-position: top right; }}
+QSpinBox::down-button {{ subcontrol-position: bottom right; }}
+QSpinBox::up-arrow, QSpinBox::down-arrow {{
+    width: 14px;
+    height: 14px;
+}}
+QSpinBox::up-arrow {{ image: url("{up}"); }}
+QSpinBox::down-arrow {{ image: url("{down}"); }}
+"""
 
 
 def palette(theme: str) -> dict[str, str]:
