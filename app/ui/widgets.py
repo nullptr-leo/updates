@@ -101,7 +101,8 @@ class ProgressBadge(QWidget):
         self.update()
 
     def set_progress(self, done: int, total: int) -> None:
-        self._done, self._total = done, total
+        self._total = max(0, total)
+        self._done = min(max(0, done), self._total)
         self.update()
 
     def text(self) -> str:

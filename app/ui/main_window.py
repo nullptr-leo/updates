@@ -374,8 +374,6 @@ class MainWindow(QMainWindow):
         if not targets:
             return False
         self.model.reset_phases([s.id for s in targets])
-        self._total = len(targets)
-        self._done = 0
         self._set_busy(True)
         self.activity.append_line(
             ("自动检查更新：" if auto else "")
@@ -384,7 +382,12 @@ class MainWindow(QMainWindow):
             + ("…" if len(targets) > 8 else ""),
             level=LogLevel.DEBUG,
         )
-        self.pool.submit(targets, mode)
+        submitted = self.pool.submit(targets, mode)
+        if submitted:
+            if self._total and self._done >= self._total:
+                self._done = 0
+                self._total = 0
+            self._total += submitted
         self._update_activity()
         return True
 
@@ -439,7 +442,7 @@ class MainWindow(QMainWindow):
 
     def _on_idle(self) -> None:
         self._set_busy(False)
-        self.activity.append_line(f"本轮任务结束（{self._done}/{self._total}）",
+        self.activity.append_line(f"任务进度（{self._done}/{self._total}）",
                                   level=LogLevel.DEBUG)
         self.statusBar().showMessage("任务结束")
         self._update_activity()
