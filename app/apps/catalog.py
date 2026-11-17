@@ -56,8 +56,9 @@ SPECS = (
 
     make("kiro", "Kiro", "开发", "https://kiro.dev/changelog/ide", "Kiro",
          exe("Kiro.exe"),
-         regex("https://kiro.dev/downloads",
-               r'\\"versions\\":\{[^}]*?\\"ide\\":\\"([\d.]+)'
+         regex("https://kiro.dev/changelog/ide",
+               r'text-secondary">([\d.]+)</span><span[^>]*>IDE'
+               "||" r'\\"versions\\":\{[^}]*?\\"ide\\":\\"([\d.]+)'
                "||" r'IDE ([\d.]+) release notes'
                "||" r'kiro-ide-([\d.]+)-stable-'),
          url("https://prod.download.desktop.kiro.dev/releases/stable/win32-x64/signed/{version}/kiro-ide-{version}-stable-win32-x64.exe"),
