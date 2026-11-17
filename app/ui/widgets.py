@@ -2,6 +2,7 @@
 panel and settings dialog."""
 from __future__ import annotations
 
+import os
 import time
 from collections import deque
 from dataclasses import replace
@@ -20,6 +21,7 @@ from PySide6.QtWidgets import (
 from ..core.config import Settings
 from ..core.models import AppSpec, LogLevel, ProgressEvent
 from ..core.registry import spec_by_id
+from ..core.services import desktop_dir
 from .table_model import PROGRESS_ROLE, AppRow
 from .theme import palette
 
@@ -473,14 +475,23 @@ class SettingsDialog(QDialog):
         self.run_on_start.setChecked(settings.run_on_start)
         self.tray = QCheckBox("关闭窗口时最小化到托盘")
         self.tray.setChecked(settings.minimize_to_tray)
-        self.download_dir = QLineEdit(settings.download_dir)
-        self.download_dir.setPlaceholderText("留空则保存到桌面")
+        initial_download_dir = os.path.normpath(
+            settings.download_dir.strip() or desktop_dir())
+        self.download_dir = QLineEdit(initial_download_dir)
+        self.download_dir.setPlaceholderText(initial_download_dir)
+        self.download_browse = QPushButton("浏览…")
+        self.download_browse.clicked.connect(self._browse_download_dir)
+        download_row = QHBoxLayout()
+        download_row.setContentsMargins(0, 0, 0, 0)
+        download_row.setSpacing(6)
+        download_row.addWidget(self.download_dir, 1)
+        download_row.addWidget(self.download_browse)
 
         form.addRow("并发数", self.concurrency)
         form.addRow("主题", self.theme)
         form.addRow("代理地址", self.proxy)
         form.addRow("", self.verify)
-        form.addRow("仅下载保存目录", self.download_dir)
+        form.addRow("仅下载保存目录", download_row)
         form.addRow("", self.schedule)
         form.addRow("", self.auto_install)
         form.addRow("检查更新间隔", self.minutes)
@@ -495,6 +506,13 @@ class SettingsDialog(QDialog):
         root = QVBoxLayout(self)
         root.addLayout(form)
         root.addWidget(buttons)
+
+    def _browse_download_dir(self) -> None:
+        current = self.download_dir.text().strip() or desktop_dir()
+        path = QFileDialog.getExistingDirectory(
+            self, "选择仅下载保存目录", current)
+        if path:
+            self.download_dir.setText(os.path.normpath(path))
 
     def values(self) -> Settings:
         return self._result
@@ -511,6 +529,7 @@ class SettingsDialog(QDialog):
             auto_install_updates=self.auto_install.isChecked(),
             run_on_start=self.run_on_start.isChecked(),
             minimize_to_tray=self.tray.isChecked(),
-            download_dir=self.download_dir.text().strip(),
+            download_dir=os.path.normpath(
+                self.download_dir.text().strip() or desktop_dir()),
         )
         super().accept()
