@@ -206,6 +206,22 @@ class AppTableModel(QAbstractTableModel):
                                   self.index(len(self._rows) - 1,
                                              self.columnCount() - 1), [])
 
+    def set_local(self, app_id: str, local: str,
+                  needs_update: bool | None = None,
+                  phase: Phase | None = None) -> bool:
+        i = self.index_of(app_id)
+        if i < 0:
+            return False
+        row = self._rows[i]
+        row.local = local
+        if needs_update is not None:
+            row.needs_update = needs_update
+        if phase is not None:
+            row.phase = phase
+        self.dataChanged.emit(self.index(i, 0),
+                              self.index(i, self.columnCount() - 1), [])
+        return True
+
     def reset_phases(self, app_ids: Iterable[str] | None = None) -> None:
         ids = set(app_ids) if app_ids is not None else None
         for row in self._rows:

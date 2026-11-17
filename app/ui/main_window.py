@@ -6,6 +6,7 @@ import platform
 import subprocess
 import threading
 from datetime import date
+from types import SimpleNamespace
 
 from PySide6 import __version__ as PYSIDE_VERSION
 from PySide6.QtCore import QObject, QProcess, Qt, QTimer, Signal
@@ -55,7 +56,7 @@ def _git_head() -> str:
 
 
 class _AsyncSignals(QObject):
-    archiveDone = Signal(bool, str)
+    archiveDone = Signal(bool, str, str, str)
     selfUpdateDone = Signal(bool, bool)
     linksReady = Signal(object)
 
@@ -815,12 +816,28 @@ class MainWindow(QMainWindow):
             self.activity.append_line(f"拖放安装：{spec.name}")
             settings = self.settings
 
-            def work(p=path, h=handler, name=spec.name) -> None:
+            def work(p=path, h=handler, name=spec.name, s=spec) -> None:
                 try:
                     h["install"](p, entries, settings)
-                    self._async.archiveDone.emit(True, f"{name} 安装完成")
+                    local = ""
+                    try:
+                        install_dir = services.find_install_dir(
+                            s.install_dirs, settings)
+                        ctx = SimpleNamespace(
+                            install_dir=lambda create=False: install_dir,
+                            settings=settings,
+                        )
+                        local = services.get_local_version(
+                            s.local, install_dir,
+                            hooks=HOOKS.get("local", {}), ctx=ctx,
+                        )
+                    except Exception:
+                        local = ""
+                    self._async.archiveDone.emit(
+                        True, f"{name} 安装完成", s.id, local)
                 except Exception as exc:
-                    self._async.archiveDone.emit(False, f"{name} 安装失败：{exc}")
+                    self._async.archiveDone.emit(
+                        False, f"{name} 安装失败：{exc}", s.id, "")
 
             threading.Thread(target=work, daemon=True).start()
             return
@@ -830,7 +847,37 @@ class MainWindow(QMainWindow):
             self, "未识别",
             f"该压缩包没有匹配到支持拖放安装的应用（{supported}）。")
 
-    def _on_archive_done(self, ok: bool, message: str) -> None:
+    def _on_archive_done(self, ok: bool, message: str,
+                         app_id: str = "", local: str = "") -> None:
         self.activity.append_line(message)
+        if ok and app_id:
+            if local:
+                spec = spec_by_id(app_id)
+                entry = cache.app_cache(app_id)
+                remote = entry.get("remote", "") or ""
+                needs = entry.get("needs_update")
+                if remote:
+                    try:
+                        needs = services.is_newer(
+                            remote, local,
+                            lexicographic=spec.lexicographic if spec else False)
+                    except Exception:
+                        pass
+                phase = (Phase.DONE if needs else
+                         Phase.UPTODATE if needs is False else None)
+                self.model.set_local(app_id, local,
+                                     needs_update=needs, phase=phase)
+                fields: dict[str, object] = {"local": local}
+                if needs is not None:
+                    fields["needs_update"] = needs
+                cache.update_app_cache(app_id, **fields)
+                state = ("可更新" if needs else
+                         "已是最新" if needs is False else "已刷新")
+                self.activity.append_line(
+                    f"{app_id} 本地版本已刷新：{local}（{state}）",
+                    level=LogLevel.DEBUG)
+            else:
+                self.activity.append_line(
+                    f"{app_id} 本地版本读取失败，未刷新", level=LogLevel.WARNING)
         if not ok:
             QMessageBox.warning(self, "拖放安装", message)
