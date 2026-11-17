@@ -505,7 +505,6 @@ def _winrar_extract(path: str, dest: str, settings: Settings | None) -> None:
     exe = _winrar_exe(settings)
     code = SubprocessPort().run(
         [exe, "x", "-o+", "-inul", "-ibck", path, dest + os.sep],
-        timeout=300,
     )
     # WinRAR returns 0 on success and 1 for non-fatal warnings.
     if code not in (0, 1):
