@@ -448,10 +448,6 @@ class SettingsDialog(QDialog):
         self.concurrency = QSpinBox()
         self.concurrency.setRange(1, 16)
         self.concurrency.setValue(settings.concurrency)
-        self.timeout = QSpinBox()
-        self.timeout.setRange(30, 7200)
-        self.timeout.setSuffix(" 秒")
-        self.timeout.setValue(settings.timeout_seconds)
         self.theme = QComboBox()
         self.theme.addItems(["跟随系统", "浅色", "深色"])
         self.theme.setCurrentIndex({"system": 0, "light": 1, "dark": 2}
@@ -481,7 +477,6 @@ class SettingsDialog(QDialog):
         self.download_dir.setPlaceholderText("留空则保存到桌面")
 
         form.addRow("并发数", self.concurrency)
-        form.addRow("单任务超时", self.timeout)
         form.addRow("主题", self.theme)
         form.addRow("代理地址", self.proxy)
         form.addRow("", self.verify)
@@ -508,7 +503,6 @@ class SettingsDialog(QDialog):
         self._result = replace(
             self._result,
             concurrency=self.concurrency.value(),
-            timeout_seconds=self.timeout.value(),
             theme=["system", "light", "dark"][self.theme.currentIndex()],
             proxy=self.proxy.text().strip(),
             verify_tls=self.verify.isChecked(),

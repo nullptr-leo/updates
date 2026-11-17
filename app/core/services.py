@@ -628,10 +628,10 @@ def extract_archive(path: str, dest: str, *, settings: Settings | None = None) -
 # processes / system side effects
 # --------------------------------------------------------------------------
 def run_process(args: Sequence[str], *, port: ProcessPort | None = None,
-                timeout: int = 300, token: CancellationToken | None = None,
+                token: CancellationToken | None = None,
                 on_output: Callable[[str], None] | None = None) -> int:
     return (port or SubprocessPort()).run(
-        list(args), timeout=timeout, token=token, on_output=on_output
+        list(args), token=token, on_output=on_output
     )
 
 

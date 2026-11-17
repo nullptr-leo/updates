@@ -82,7 +82,6 @@ class Settings:
     run_on_start: bool = False
     auto_install_updates: bool = True
     concurrency: int = 4
-    timeout_seconds: int = 600
     download_dir: str = ""
     search_paths: list[str] = field(default_factory=default_search_paths)
     theme: str = "system"

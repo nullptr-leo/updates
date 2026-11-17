@@ -7,7 +7,6 @@ offline are held in a pending queue and resumed once the connection is back.
 from __future__ import annotations
 
 import threading
-import time
 import traceback
 from typing import Iterable
 
@@ -59,7 +58,7 @@ class _TaskRunner(QRunnable):
 
 
 class TaskPool(QObject):
-    """Bounded concurrency, per-task cancellation and a timeout watchdog."""
+    """Bounded concurrency and per-task cancellation."""
 
     event = Signal(object)
     taskStarted = Signal(str)
@@ -81,14 +80,8 @@ class TaskPool(QObject):
         self._lifecycle.started.connect(self._on_started)
         self._lifecycle.finished.connect(self._on_finished)
         self._tokens: dict[str, CancellationToken] = {}
-        self._starts: dict[str, float] = {}
-        self._waiting: set[str] = set()
         self._pending: dict[str, tuple[AppSpec, Mode, CancellationToken]] = {}
         self._lock = threading.Lock()
-        self._watchdog = QTimer(self)
-        self._watchdog.setInterval(2000)
-        self._watchdog.timeout.connect(self._check_timeouts)
-        self._watchdog.start()
         self._network_timer = QTimer(self)
         self._network_timer.setInterval(
             max(500, int(services.NETWORK_POLL_SECONDS * 1000)))
@@ -108,39 +101,18 @@ class TaskPool(QObject):
                            self._bridge, self._lifecycle)
 
     def _forward(self, ev: ProgressEvent) -> None:
-        with self._lock:
-            if ev.phase == Phase.WAITING_NETWORK:
-                self._waiting.add(ev.app_id)
-            elif ev.app_id in self._waiting:
-                self._waiting.discard(ev.app_id)
-                # Waiting for a connection must not consume the timeout budget.
-                self._starts[ev.app_id] = time.monotonic()
         self.event.emit(ev)
 
     def _on_started(self, app_id: str) -> None:
-        with self._lock:
-            if app_id in self._tokens:
-                self._starts[app_id] = time.monotonic()
         self.taskStarted.emit(app_id)
 
     def _on_finished(self, app_id: str) -> None:
         with self._lock:
             self._tokens.pop(app_id, None)
-            self._starts.pop(app_id, None)
-            self._waiting.discard(app_id)
             remaining = len(self._tokens)
         self.taskFinished.emit(app_id)
         if remaining == 0:
             self.idle.emit()
-
-    def _check_timeouts(self) -> None:
-        limit = max(30, int(self.settings.timeout_seconds))
-        now = time.monotonic()
-        with self._lock:
-            expired = [k for k, started in self._starts.items()
-                       if k not in self._waiting and now - started > limit]
-        for app_id in expired:
-            self.cancel(app_id)
 
     def _resume_pending(self) -> None:
         online, _ = self._network_status()

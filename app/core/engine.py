@@ -343,8 +343,7 @@ class UpdateEngine:
         if inst.kind == "installer":
             args = [dest] + shlex.split(inst.args)
             code = services.run_process(
-                args, port=self.port, timeout=self.settings.timeout_seconds,
-                token=token,
+                args, port=self.port, token=token,
                 on_output=lambda line: self._send(
                     spec, Phase.INSTALLING, message=line[:120]
                 ),

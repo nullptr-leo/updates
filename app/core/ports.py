@@ -1,9 +1,9 @@
 """Process port: core defines the contract, Qt supplies the implementation.
 
 External installers are the only things still executed as child processes.
-They are asynchronous from the UI's point of view, bounded by a timeout and
-killable on cancellation — unlike the legacy ``subprocess.call(...)`` which
-blocked forever with no hidden-window flag.
+They are asynchronous from the UI's point of view and killable on cancellation —
+unlike the legacy ``subprocess.call(...)`` which blocked forever with no
+hidden-window flag.
 """
 from __future__ import annotations
 
@@ -11,11 +11,10 @@ import queue
 import subprocess
 import sys
 import threading
-import time
 from typing import Callable, Protocol, Sequence
 
 from .cancellation import CancellationToken
-from .models import Cancelled, TimedOut
+from .models import Cancelled
 
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
@@ -25,7 +24,6 @@ class ProcessPort(Protocol):
         self,
         args: Sequence[str],
         *,
-        timeout: int = 0,
         token: CancellationToken | None = None,
         on_output: Callable[[str], None] | None = None,
     ) -> int: ...
@@ -38,7 +36,6 @@ class SubprocessPort:
         self,
         args: Sequence[str],
         *,
-        timeout: int = 0,
         token: CancellationToken | None = None,
         on_output: Callable[[str], None] | None = None,
     ) -> int:
@@ -61,7 +58,6 @@ class SubprocessPort:
             lines.put(None)
 
         threading.Thread(target=_reader, daemon=True).start()
-        deadline = time.monotonic() + timeout if timeout > 0 else None
         try:
             while True:
                 try:
@@ -77,9 +73,6 @@ class SubprocessPort:
                 if token is not None and token.cancelled:
                     proc.kill()
                     raise Cancelled("安装进程已取消")
-                if deadline is not None and time.monotonic() > deadline:
-                    proc.kill()
-                    raise TimedOut("安装进程超时")
             return proc.wait(timeout=5)
         finally:
             if proc.poll() is None:
