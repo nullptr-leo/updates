@@ -518,9 +518,9 @@ class UpdateEngine:
                 # URLs and package names keep using the plain version string.
                 local = _version_label(local, info.extra.get("local_date"))
                 remote = _version_label(version, info.extra.get("remote_date"))
-                # Force modes skip the installed-version probe: "0" is only a
-                # sentinel for is_newer(), never a version to display.
-                if mode.is_force and local.startswith("0"):
+                # A missing install or a force-mode sentinel has no real
+                # version: show a dash instead of an empty/placeholder value.
+                if not_installed or (mode.is_force and local.startswith("0")):
                     local = "—"
                 self._send(spec, Phase.CHECKING, message="", local_version=local,
                            remote_version=remote, needs_update=needs)
