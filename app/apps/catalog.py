@@ -319,6 +319,15 @@ SPECS = (
          installer("/verysilent /mergetasks=!desktopicon,!startupicon"),
          post=("taskkill:TickTick.exe",)),
 
+    make("workreview", "Work Review", "效率",
+         "https://github.com/wm94i/Work-Review",
+         r"C:\Program Files\Work Review", exe("Work_Review.exe"),
+         regex("https://api.github.com/repos/wm94i/Work-Review/releases",
+               r'"tag_name":\s*"v?([\d.]+(?:-[A-Za-z0-9.]+)?)'),
+         url("https://github.com/wm94i/Work-Review/releases/download/v{version}/Work_Review_{version}_x64-setup.exe"),
+         installer("/S"),
+         post=("taskkill:Work_Review.exe",)),
+
     make("workbuddy", "WorkBuddy", "效率", "https://www.workbuddy.cn/",
          "WorkBuddy", exe("WorkBuddy.exe"),
          RemoteSpec(url="https://www.workbuddy.cn/v2/update?platform=workbuddy-win32-x64-user",
