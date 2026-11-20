@@ -27,7 +27,9 @@ from ..core.config import (
     restart_command, save_settings,
 )
 from ..core.engine import UpdateEngine
-from ..core.models import ACTIVE_PHASES, AppSpec, LogLevel, Mode, Phase, ProgressEvent
+from ..core.models import (
+    ACTIVE_PHASES, AppSpec, ErrorInfo, LogLevel, Mode, Phase, ProgressEvent,
+)
 from ..core.registry import spec_by_id, visible_specs
 from ..workers.update_worker import TaskPool
 from .table_model import (
@@ -863,6 +865,14 @@ class MainWindow(QMainWindow):
             handler = HOOKS["archive"].get(spec.archive_handler) if spec.archive_handler else None
             if not handler or not handler["match"](entries):
                 continue
+            if self.pool.is_active(spec.id):
+                self.activity.append_line(
+                    f"{spec.name} 正在更新中，跳过拖放安装",
+                    level=LogLevel.WARNING,
+                )
+                return
+            self.model.set_phase(spec.id, Phase.INSTALLING)
+            self._update_stats()
             self.activity.append_line(f"拖放安装：{spec.name}")
             settings = self.settings
 
@@ -914,7 +924,7 @@ class MainWindow(QMainWindow):
                     except Exception:
                         pass
                 phase = (Phase.DONE if needs else
-                         Phase.UPTODATE if needs is False else None)
+                         Phase.UPTODATE if needs is False else Phase.DONE)
                 self.model.set_local(app_id, local,
                                      needs_update=needs, phase=phase)
                 fields: dict[str, object] = {"local": local}
@@ -926,8 +936,18 @@ class MainWindow(QMainWindow):
                 self.activity.append_line(
                     f"{app_id} 本地版本已刷新：{local}（{state}）",
                     level=LogLevel.DEBUG)
+                self._update_stats()
             else:
+                self.model.set_phase(
+                    app_id, Phase.DONE, "安装完成，本地版本读取失败")
                 self.activity.append_line(
                     f"{app_id} 本地版本读取失败，未刷新", level=LogLevel.WARNING)
+                self._update_stats()
+        elif not ok and app_id:
+            self.model.set_phase(
+                app_id, Phase.FAILED, message,
+                ErrorInfo(kind="DragDropInstall", message=message),
+            )
+            self._update_stats()
         if not ok:
             QMessageBox.warning(self, "拖放安装", message)

@@ -206,6 +206,19 @@ class AppTableModel(QAbstractTableModel):
                                   self.index(len(self._rows) - 1,
                                              self.columnCount() - 1), [])
 
+    def set_phase(self, app_id: str, phase: Phase, message: str = "",
+                  error: ErrorInfo | None = None) -> bool:
+        i = self.index_of(app_id)
+        if i < 0:
+            return False
+        row = self._rows[i]
+        row.phase = phase
+        row.message = message
+        row.error = error
+        self.dataChanged.emit(self.index(i, 0),
+                              self.index(i, self.columnCount() - 1), [])
+        return True
+
     def set_local(self, app_id: str, local: str,
                   needs_update: bool | None = None,
                   phase: Phase | None = None) -> bool:
@@ -214,6 +227,8 @@ class AppTableModel(QAbstractTableModel):
             return False
         row = self._rows[i]
         row.local = local
+        row.message = ""
+        row.error = None
         if needs_update is not None:
             row.needs_update = needs_update
         if phase is not None:
