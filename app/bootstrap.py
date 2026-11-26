@@ -47,11 +47,10 @@ def _already_running() -> bool:
 
 def run_cli(argv: list[str]) -> int:
     """Headless check/update without Qt: python main.pyw --cli check [ids...]."""
-    from .apps.hooks import HOOKS
+    from .apps import HOOKS, registry
     from .core.cancellation import CancellationToken
     from .core.engine import UpdateEngine
     from .core.models import Mode
-    from .core.registry import all_specs, spec_by_id
 
     settings = load_settings()
     if len(argv) < 2:
@@ -62,8 +61,8 @@ def run_cli(argv: list[str]) -> int:
     except ValueError:
         mode = Mode.CHECK
     ids = argv[2:]
-    specs = ([spec_by_id(i) for i in ids if spec_by_id(i)] if ids
-             else list(all_specs()))
+    specs = ([registry.by_id(i) for i in ids if registry.by_id(i)] if ids
+             else list(registry.all()))
     if not specs:
         print("没有匹配的应用")
         return 1

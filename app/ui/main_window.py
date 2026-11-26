@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 
 from .. import __version__
 from ..adapters.qt_process import QProcessPort
-from ..apps.hooks import HOOKS
+from ..apps import HOOKS, registry
 from ..core import cache, services
 from ..core.config import (
     CONFIG_PATH, ICON_PATH, IS_FROZEN, PROJECT_ROOT, Settings, load_settings,
@@ -30,7 +30,6 @@ from ..core.engine import UpdateEngine
 from ..core.models import (
     ACTIVE_PHASES, AppSpec, ErrorInfo, LogLevel, Mode, Phase, ProgressEvent,
 )
-from ..core.registry import spec_by_id, visible_specs
 from ..workers.update_worker import TaskPool
 from .table_model import (
     C_CATEGORY, C_CHECKED, C_LOCAL, C_NAME, C_REMOTE, C_STATUS,
@@ -207,7 +206,7 @@ class MainWindow(QMainWindow):
         self.pool.taskFinished.connect(lambda _app_id: self._update_activity())
         self.pool.idle.connect(self._on_idle)
 
-        self.model = AppTableModel(visible_specs(settings), self)
+        self.model = AppTableModel(registry.visible(settings), self)
         self.model.apply_cache(cache.load_cache())
         self.proxy = AppFilterProxyModel(self)
         self.proxy.setSourceModel(self.model)
@@ -316,7 +315,7 @@ class MainWindow(QMainWindow):
         horizontal.setStretchFactor(0, 1)
         horizontal.setSizes([760, 260])
 
-        self.activity = ActivityPanel()
+        self.activity = ActivityPanel(registry)
         vertical = QSplitter(Qt.Orientation.Vertical)
         vertical.addWidget(horizontal)
         vertical.addWidget(self.activity)
@@ -582,7 +581,7 @@ class MainWindow(QMainWindow):
         self.activity.append_line("已恢复所有软件为配方默认代理策略")
 
     def _on_detail_action(self, app_id: str, action: str) -> None:
-        spec = spec_by_id(app_id)
+        spec = registry.by_id(app_id)
         if spec is None:
             return
         if action == "check":
@@ -645,7 +644,7 @@ class MainWindow(QMainWindow):
             self._rebuild_model()
 
     def _rebuild_model(self) -> None:
-        model = AppTableModel(visible_specs(self.settings), self)
+        model = AppTableModel(registry.visible(self.settings), self)
         model.apply_cache(cache.load_cache())
         model.adopt_state(self.model)
         self.model = model
@@ -905,7 +904,7 @@ class MainWindow(QMainWindow):
         self.activity.append_line(message)
         if ok and app_id:
             if local:
-                spec = spec_by_id(app_id)
+                spec = registry.by_id(app_id)
                 entry = cache.app_cache(app_id)
                 remote = entry.get("remote", "") or ""
                 needs = entry.get("needs_update")

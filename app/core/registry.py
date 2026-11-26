@@ -1,25 +1,31 @@
-"""Application registry: replaces glob + AST parsing of script sources."""
+"""Application registry: a catalogue of recipes looked up by id.
+
+The core defines what a registry can do but holds no recipes of its own. The
+application layer builds one from its catalogue (``app/apps/__init__.py``),
+so ``app.core`` never imports ``app.apps``.
+"""
 from __future__ import annotations
 
-from ..apps.catalog import SPECS
+from typing import Sequence
+
 from .config import Settings
 from .models import AppSpec
 
-_BY_ID = {spec.id: spec for spec in SPECS}
 
+class AppRegistry:
+    def __init__(self, specs: Sequence[AppSpec]) -> None:
+        self._specs: tuple[AppSpec, ...] = tuple(specs)
+        self._by_id = {spec.id: spec for spec in self._specs}
 
-def all_specs() -> tuple[AppSpec, ...]:
-    return SPECS
+    def all(self) -> tuple[AppSpec, ...]:
+        return self._specs
 
+    def visible(self, settings: Settings) -> list[AppSpec]:
+        ignored = set(settings.ignored)
+        return [s for s in self._specs if s.id not in ignored]
 
-def visible_specs(settings: Settings) -> list[AppSpec]:
-    ignored = set(settings.ignored)
-    return [s for s in SPECS if s.id not in ignored]
+    def by_id(self, app_id: str) -> AppSpec | None:
+        return self._by_id.get(app_id)
 
-
-def spec_by_id(app_id: str) -> AppSpec | None:
-    return _BY_ID.get(app_id)
-
-
-def categories() -> list[str]:
-    return sorted({s.category for s in SPECS})
+    def categories(self) -> list[str]:
+        return sorted({s.category for s in self._specs})

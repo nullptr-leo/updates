@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 
 from ..core.config import Settings
 from ..core.models import AppSpec, LogLevel, ProgressEvent
-from ..core.registry import spec_by_id
+from ..core.registry import AppRegistry
 from ..core.services import desktop_dir
 from .table_model import PROGRESS_ROLE, AppRow
 from .theme import palette
@@ -331,9 +331,10 @@ class ActivityPanel(QFrame):
         (LogLevel.ERROR, "错误"),
     )
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, registry: AppRegistry, parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("Card")
+        self._registry = registry
         self._records: deque[tuple[LogLevel, str]] = deque(maxlen=3000)
         self._min_level = LogLevel.INFO
         root = QVBoxLayout(self)
@@ -400,7 +401,7 @@ class ActivityPanel(QFrame):
     def append_event(self, ev: ProgressEvent) -> None:
         stamp = time.strftime("%H:%M:%S", time.localtime(ev.timestamp))
         level = ev.effective_level
-        spec = spec_by_id(ev.app_id)
+        spec = self._registry.by_id(ev.app_id)
         appname = spec.name if spec is not None else ev.app_id
         tail = f" {ev.message}" if ev.message else ""
         self._record(
