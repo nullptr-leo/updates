@@ -494,7 +494,7 @@ SPECS = (
                   r"WeCom_([\d\.]*)\.exe"),
          url("https://work.weixin.qq.com/wework_admin/commdownload?platform=win&from=wwindex"),
          installer(),
-         post=("taskkill:WXWork.exe",)),
+         post=("taskkill:WXWork.exe", "shortcut:企业微信")),
 
     make("weixin", "微信", "通讯",
          "https://www.52pojie.cn/forum.php?mod=forumdisplay&fid=16&typeid=231&filter=typeid&typeid=231",
