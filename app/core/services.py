@@ -17,36 +17,20 @@ import sys
 import tempfile
 import time
 import zipfile
-from contextlib import closing
 from typing import Callable, Iterable, Sequence
 
-import requests
 from packaging import version as pkg_version
 
 from .atomic_io import rmtree_with_retry, temporary_workspace
 from .cancellation import CancellationToken
 from .config import Settings, UNRAR_DLL
-from .models import AppSpec, Cancelled, LocalSpec, NotInstalled, QueryFailed, TimedOut
+from .models import LocalSpec, NotInstalled, QueryFailed, TimedOut
 from .ports import CREATE_NO_WINDOW, ProcessPort, SubprocessPort
 
 try:
     import win32api
 except ImportError:  # pragma: no cover - allows core import on non-Windows
     win32api = None
-
-DEFAULT_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
-    ),
-    "Accept-Encoding": "gzip, deflate",
-}
-
-_NETWORK_ERRORS = (
-    requests.exceptions.ConnectionError,
-    requests.exceptions.Timeout,
-    requests.exceptions.RequestException,
-)
 
 # Interval used when a task is suspended in "等待连接".
 NETWORK_POLL_SECONDS = 2.0
@@ -144,108 +128,6 @@ def network_status() -> tuple[bool, str]:
     return _probe_reachability()
 
 
-def is_connection_error(exc: BaseException) -> bool:
-    """Whether a failure is caused by connectivity rather than a bad response."""
-    current: BaseException | None = exc
-    for _ in range(5):
-        if current is None:
-            return False
-        if isinstance(current, (requests.exceptions.ConnectionError,
-                                requests.exceptions.Timeout,
-                                ConnectionError, TimeoutError)):
-            return True
-        if isinstance(current, QueryFailed) and str(current).startswith("网络错误"):
-            return True
-        current = current.__cause__ or current.__context__
-    return False
-
-
-def _use_proxy(settings: Settings | None,
-               spec: AppSpec | None = None) -> bool:
-    rules = getattr(settings, "proxy_rules", None) or {}
-    rule = rules.get(spec.id) if spec else None
-    if rule == "proxy":
-        return True
-    if rule == "direct":
-        return False
-    return spec.proxy if spec else True
-
-
-def _proxies(settings: Settings | None,
-             spec: AppSpec | None = None) -> dict | None:
-    if not _use_proxy(settings, spec):
-        return None
-    addr = (settings.proxy if settings else "") or os.environ.get("UPDATE_PROXY_ADDR", "")
-    if not addr:
-        return None
-    return {"http": addr, "https": addr}
-
-
-def _verify(settings: Settings | None) -> bool:
-    return bool(settings.verify_tls) if settings else True
-
-
-def http_get(
-    url: str,
-    *,
-    settings: Settings | None = None,
-    spec: AppSpec | None = None,
-    headers: dict | None = None,
-    timeout: int = 30,
-) -> str:
-    """Fetch a URL and return its text. Raises QueryFailed, never exits."""
-    try:
-        response = requests.get(
-            url,
-            headers={**DEFAULT_HEADERS, **(headers or {})},
-            proxies=_proxies(settings, spec),
-            verify=_verify(settings),
-            timeout=(10, timeout),
-        )
-        response.raise_for_status()
-        return response.text
-    except _NETWORK_ERRORS as exc:
-        raise QueryFailed(f"网络错误: {type(exc).__name__}") from exc
-    except Exception as exc:
-        raise QueryFailed(str(exc) or repr(exc)) from exc
-
-
-def get_redirected_url(url: str, *, settings: Settings | None = None,
-                       spec: AppSpec | None = None) -> str:
-    """Resolve the final URL after redirects (HEAD, then streaming GET)."""
-    try:
-        response = requests.head(
-            url,
-            headers=DEFAULT_HEADERS,
-            proxies=_proxies(settings, spec),
-            verify=_verify(settings),
-            allow_redirects=True,
-            timeout=(10, 30),
-        )
-        if response.url and response.url != url:
-            return response.url
-        raise ValueError("HEAD did not redirect")
-    except Exception:
-        try:
-            with closing_get(url, settings=settings, spec=spec) as response:
-                return response.url
-        except Exception as exc:
-            raise QueryFailed(f"重定向查询失败: {exc}") from exc
-
-
-def closing_get(url: str, *, settings: Settings | None = None,
-                spec: AppSpec | None = None):
-    return requests.get(
-        url,
-        headers=DEFAULT_HEADERS,
-        proxies=_proxies(settings, spec),
-        verify=_verify(settings),
-        stream=True,
-        allow_redirects=True,
-        timeout=(10, 30),
-    )
-
-
 def query_rendered(url: str, *, timeout: int = 40) -> str:
     """Render a JS-challenged page with headless Edge, as a separate process."""
     candidates = [
@@ -271,52 +153,6 @@ def query_rendered(url: str, *, timeout: int = 40) -> str:
         raise TimedOut("页面渲染超时") from exc
     except Exception as exc:
         raise QueryFailed(f"页面渲染失败: {exc}") from exc
-
-
-def download_file(
-    url: str,
-    dest: str,
-    *,
-    settings: Settings | None = None,
-    spec: AppSpec | None = None,
-    token: CancellationToken | None = None,
-    headers: dict | None = None,
-    on_progress: Callable[[int, int], None] | None = None,
-) -> None:
-    """Stream a download with cooperative cancellation and byte progress."""
-    if not url:
-        raise QueryFailed("下载地址为空")
-    try:
-        with closing(requests.get(
-            url,
-            headers={**DEFAULT_HEADERS, **(headers or {})},
-            proxies=_proxies(settings, spec),
-            verify=_verify(settings),
-            stream=True,
-            timeout=(30, 120),
-        )) as response:
-            response.raise_for_status()
-            total = int(response.headers.get("Content-Length") or 0)
-            current = 0
-            os.makedirs(os.path.dirname(dest), exist_ok=True)
-            with open(dest, "wb") as fh:
-                for chunk in response.iter_content(chunk_size=64 * 1024):
-                    if token is not None:
-                        token.raise_if_cancelled()
-                    if not chunk:
-                        continue
-                    fh.write(chunk)
-                    current += len(chunk)
-                    if on_progress:
-                        on_progress(current, total)
-        if on_progress:
-            on_progress(current, total or current)
-    except (Cancelled, TimedOut):
-        raise
-    except _NETWORK_ERRORS as exc:
-        raise QueryFailed(f"下载失败: {type(exc).__name__}") from exc
-    except Exception as exc:
-        raise QueryFailed(f"下载失败: {exc}") from exc
 
 
 # --------------------------------------------------------------------------

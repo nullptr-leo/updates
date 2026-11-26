@@ -15,14 +15,6 @@ from .base import (
     redirect, regex, url,
 )
 
-VOID_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
-    ),
-    "Accept-Encoding": "gzip, deflate",
-}
-
 SPECS = (
     # ---------------------------------------------------------------- 开发
     make("adb", "ADB Platform Tools", "开发",
@@ -121,8 +113,7 @@ SPECS = (
          "Everything", exe("Everything.exe"),
          RemoteSpec(url="https://www.voidtools.com/downloads/",
                     kind="findall_max",
-                    pattern=r"Everything\-([\d.]+[ab])?\.x64\.zip",
-                    headers=VOID_HEADERS),
+                    pattern=r"Everything\-([\d.]+[ab])?\.x64\.zip"),
          url("https://www.voidtools.com/Everything-{version}.x64.zip"),
          extract("overwrite"),
          post=("taskkill:Everything.exe",)),
@@ -171,8 +162,7 @@ SPECS = (
          "Void Image Viewer", exe("voidImageViewer.exe"),
          RemoteSpec(url="https://www.voidtools.com/zh-cn/downloads",
                     kind="regex",
-                    pattern=r"voidImageViewer\-([\d\.]*)\.x64",
-                    headers=VOID_HEADERS),
+                    pattern=r"voidImageViewer\-([\d\.]*)\.x64"),
          url("https://www.voidtools.com/voidImageViewer-{version}.x64.en-US.zip"),
          extract("overwrite"),
          post=("taskkill:voidImageViewer.exe",)),

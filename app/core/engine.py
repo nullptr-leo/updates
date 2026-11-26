@@ -15,7 +15,7 @@ import time
 import traceback
 from typing import Any, Callable, Mapping
 
-from . import cache, services
+from . import cache, http, services
 from .atomic_io import temporary_workspace
 from .cancellation import CancellationToken
 from .config import Settings, download_dir
@@ -118,11 +118,11 @@ class Context:
         self.token.raise_if_cancelled()
         kwargs.setdefault("settings", self.settings)
         kwargs.setdefault("spec", self.spec)
-        return services.http_get(url, **kwargs)
+        return self.engine.http.get_text(url, **kwargs)
 
     def redirected(self, url: str) -> str:
         self.token.raise_if_cancelled()
-        return services.get_redirected_url(
+        return self.engine.http.final_url(
             url, settings=self.settings, spec=self.spec)
 
     def rendered(self, url: str) -> str:
@@ -160,6 +160,7 @@ class UpdateEngine:
         self.settings = settings
         self.emit = emit
         self.port = port or SubprocessPort()
+        self.http = http.client()
         self.hooks: Hooks = hooks or {}
         self.log = get_logger()
         # One-shot CLI runs report "等待连接" instead of blocking forever.
@@ -204,14 +205,14 @@ class UpdateEngine:
             result = self._hook("remote", remote.custom)(ctx)
             return result if isinstance(result, RemoteInfo) else RemoteInfo(version=str(result))
         if remote.kind == "redirect":
-            final = services.get_redirected_url(
+            final = self.http.final_url(
                 remote.url, settings=self.settings, spec=spec)
             return RemoteInfo(version=self._extract_version(remote, final),
                               url=final, text=final)
         if remote.kind == "headless":
             text = services.query_rendered(remote.url)
         else:
-            text = services.http_get(
+            text = self.http.get_text(
                 remote.url, settings=self.settings, spec=spec,
                 headers=dict(remote.headers or {}),
             )
@@ -290,8 +291,8 @@ class UpdateEngine:
             self._send(spec, Phase.DOWNLOADING, message=text,
                        current=current, total=total)
 
-        services.download_file(url, dest, settings=self.settings, spec=spec,
-                               token=token, on_progress=progress)
+        self.http.download(url, dest, settings=self.settings, spec=spec,
+                           token=token, on_progress=progress)
 
     @staticmethod
     def _extract_source(root: str, inst: InstallSpec) -> str:
@@ -621,7 +622,7 @@ class UpdateEngine:
             except Exception as exc:
                 if (self.wait_for_network
                         and attempt + 1 < NETWORK_ATTEMPTS
-                        and services.is_connection_error(exc)
+                        and http.is_connection_error(exc)
                         and not self._network_status()[0]):
                     self.log.info("[%s] 网络中断，等待连接后重试", spec.id)
                     retry_after_outage = True
