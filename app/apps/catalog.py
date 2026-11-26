@@ -65,6 +65,15 @@ SPECS = (
          installer("/verysilent /mergetasks=!runcode,!desktopicon,!quicklaunchicon,!addcontextmenufiles,!addcontextmenufolders,!associatewithfiles,!addtopath"),
          post=("taskkill:Kiro.exe",)),
 
+    make("kirocrew", "KiroCrew", "开发",
+         "https://github.com/kirodotdev/KiroCrew",
+         r"C:\Program Files\KiroCrew", exe("KiroCrew.exe"),
+         regex("https://api.github.com/repos/kirodotdev/KiroCrew/releases",
+               r'"tag_name":\s*"v?([\d.]+(?:-[A-Za-z0-9.]+)?)'),
+         url("https://github.com/kirodotdev/KiroCrew/releases/download/v{version}/KiroCrew-{version}-Setup-x64.exe"),
+         extract("overwrite"),
+         post=("taskkill:KiroCrew.exe",)),
+
     make("powershell", "PowerShell", "开发",
          "https://github.com/PowerShell/powershell",
          r"C:\Program Files\PowerShell\7", exe("pwsh.exe"),
