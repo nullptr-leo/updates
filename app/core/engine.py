@@ -32,6 +32,10 @@ Hooks = Mapping[str, Mapping[str, Callable[..., Any]]]
 # How many times a task may be restarted after a connection loss.
 NETWORK_ATTEMPTS = 3
 
+# Windows success codes for installers: 0 = done, 1641 = reboot started,
+# 3010 = reboot required. Both reboot codes are a successful install.
+INSTALL_SUCCESS_CODES = frozenset({0, 1641, 3010})
+
 
 def _transform(raw: str, transform: str) -> str:
     if transform == "digits_dot":
@@ -127,6 +131,14 @@ class Context:
 
     def install_dir(self, create: bool = False) -> str:
         return services.find_install_dir(self.spec.install_dirs, self.settings, create)
+
+    def replace_tree(self, source: str, target: str) -> None:
+        """Overlay ``source`` onto ``target`` the way the built-in extract
+        install does: taskkill returns before Windows releases the file
+        handles, so a copy that hits a lock re-closes the app and retries."""
+        unlock = lambda: self.engine._close_running(self.spec)
+        self.engine._retry_on_lock(
+            lambda: shutil.copytree(source, target, dirs_exist_ok=True), unlock)
 
     def log(self, message: str) -> None:
         get_logger().info("[%s] %s", self.spec.id, message)
@@ -348,8 +360,11 @@ class UpdateEngine:
                     spec, Phase.INSTALLING, message=line[:120]
                 ),
             )
-            if code != 0:
+            if code not in INSTALL_SUCCESS_CODES:
                 raise QueryFailed(f"安装程序退出码 {code}")
+            if code:
+                self.log.info("[%s] 安装程序退出码 %s（需要重启）", spec.id, code)
+                self._send(spec, Phase.INSTALLING, message="安装完成，需要重启电脑")
             return
         if inst.kind == "copy":
             target_dir = ctx.install_dir(create=True)

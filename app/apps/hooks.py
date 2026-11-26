@@ -17,6 +17,7 @@ import time
 from typing import Any
 
 from ..core import services
+from ..core.atomic_io import temporary_workspace
 from ..core.models import NotInstalled, QueryFailed, RemoteInfo
 
 try:
@@ -197,8 +198,7 @@ def local_thunderbird(ctx) -> str:
 # install hooks
 # --------------------------------------------------------------------------
 def install_vlc(ctx, info: RemoteInfo, dest: str) -> None:
-    tmp = tempfile.mkdtemp(prefix="us-vlc-")
-    try:
+    with temporary_workspace(prefix="us-vlc-") as tmp:
         services.extract_archive(dest, tmp, settings=ctx.settings)
         candidates = [p for p in glob.glob(os.path.join(tmp, "vlc-*"))
                       if os.path.isdir(p)]
@@ -206,15 +206,12 @@ def install_vlc(ctx, info: RemoteInfo, dest: str) -> None:
             raise QueryFailed("VLC 解压目录不存在")
         target = ctx.install_dir(create=True)
         shutil.rmtree(target, ignore_errors=True)
-        shutil.copytree(candidates[0], target, dirs_exist_ok=True)
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+        ctx.replace_tree(candidates[0], target)
 
 
 def install_thunderbird(ctx, info: RemoteInfo, dest: str) -> None:
     """Never run the installer: extract it and copy core's contents."""
-    tmp = tempfile.mkdtemp(prefix="us-thunderbird-")
-    try:
+    with temporary_workspace(prefix="us-thunderbird-") as tmp:
         services.extract_archive(dest, tmp, settings=ctx.settings)
         cores = [p for p in glob.glob(os.path.join(tmp, "**", "core"),
                                       recursive=True)
@@ -222,9 +219,7 @@ def install_thunderbird(ctx, info: RemoteInfo, dest: str) -> None:
         if not cores:
             raise QueryFailed("Thunderbird 安装包中未找到 core 目录")
         target = ctx.install_dir(create=True)
-        shutil.copytree(min(cores, key=len), target, dirs_exist_ok=True)
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+        ctx.replace_tree(min(cores, key=len), target)
 
 
 # --------------------------------------------------------------------------
