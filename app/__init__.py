@@ -1,2 +1,2 @@
 """Update Scripts 2.0 — PySide6 application."""
-__version__ = "2.1.220"
+__version__ = "2.1.222"

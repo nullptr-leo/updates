@@ -824,8 +824,7 @@ class MainWindow(QMainWindow):
             self.activity.append_line("升级软件：未完成")
             QMessageBox.warning(
                 self, "升级失败",
-                "暂时无法获取最新版本，请检查网络连接后稍后重试。\n"
-                "详细信息已写入日志。",
+                "暂时无法获取最新版本，请检查网络连接后重试。",
             )
             return
         if not changed:

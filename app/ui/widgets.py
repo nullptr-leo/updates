@@ -328,7 +328,7 @@ class ActivityPanel(QFrame):
         (LogLevel.DEBUG, "详细"),
         (LogLevel.INFO, "常规"),
         (LogLevel.WARNING, "重要"),
-        (LogLevel.ERROR, "仅错误"),
+        (LogLevel.ERROR, "错误"),
     )
 
     def __init__(self, parent=None) -> None:
