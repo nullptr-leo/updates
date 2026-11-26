@@ -28,7 +28,8 @@ from ..core.config import (
 )
 from ..core.engine import UpdateEngine
 from ..core.models import (
-    ACTIVE_PHASES, AppSpec, ErrorInfo, LogLevel, Mode, Phase, ProgressEvent,
+    ACTIVE_PHASES, AppSpec, ErrorInfo, LocalKind, LogLevel, Mode, Phase,
+    ProgressEvent,
 )
 from ..workers.update_worker import TaskPool
 from .table_model import (
@@ -609,7 +610,8 @@ class MainWindow(QMainWindow):
             root = services.find_install_dir(spec.install_dirs, self.settings)
         except Exception:
             return ""
-        if spec.local and spec.local.kind in ("exe", "parts", "mtime"):
+        if spec.local and spec.local.kind in (LocalKind.EXE, LocalKind.PARTS,
+                                              LocalKind.MTIME):
             return os.path.join(root, spec.local.target)
         return root
 

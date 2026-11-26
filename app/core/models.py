@@ -122,13 +122,138 @@ class Mode(Enum):
         }[self]
 
 
+# ---------------------------------------------------------------------------
+# Recipe DSL: every "how" below is an enum member or a small typed object, so a
+# typo in a recipe fails at import time instead of at update time.
+# ---------------------------------------------------------------------------
+class LocalKind(Enum):
+    """How to read the installed version."""
+    EXE = "exe"            # FileVersion of an .exe
+    PRODUCT = "product"    # ProductVersion from the localized string table
+    APPX = "appx"          # version of an AppX / MSIX package
+    PARTS = "parts"        # FileVersion fields combined through a pattern
+    FILE = "file"          # regex over a text file
+    GLOB = "glob"          # regex over the first matching file name
+    COMMAND = "command"    # regex over a command's stdout
+    MTIME = "mtime"        # modification date of a file
+    CUSTOM = "custom"      # hook in the "local" group
+
+
+class RemoteKind(Enum):
+    """Where the newest version comes from."""
+    REGEX = "regex"
+    JSON = "json"
+    REDIRECT = "redirect"        # version parsed from the final URL
+    FINDALL_MAX = "findall_max"  # highest of all regex hits
+    HEADLESS = "headless"        # page rendered by headless Edge
+    CUSTOM = "custom"            # hook in the "remote" group
+
+
+class VersionTransform(Enum):
+    """Post-processing of a raw version string."""
+    DIGITS_DOT = "digits_dot"    # "1213" -> "1.2.1.3"
+    STRIP_LAST = "strip_last"    # "1.2.3.4" -> "1.2.3"
+    GROUPS_JOIN = "groups_join"  # join regex groups 2..n
+
+
+class ResponseKind(Enum):
+    """Kind of expression that locates the download URL in a response."""
+    REGEX = "regex"
+    JSON = "json"
+
+
+class InstallKind(Enum):
+    INSTALLER = "installer"    # run the downloaded package
+    EXTRACT = "extract"        # unpack into the install directory
+    COPY = "copy"              # copy the single downloaded file
+    DESKTOP = "desktop"        # leave the package on the desktop
+    MANUAL = "manual"          # only open the download page
+    CUSTOM = "custom"          # hook in the "install" group
+
+
+class DeployMode(Enum):
+    """How extracted files land in the install directory."""
+    OVERWRITE = "overwrite"        # copy the archive root over it
+    SUBDIR = "subdir"              # copy one sub-directory by its name
+    SUBDIR_GLOB = "subdir_glob"    # copy the first sub-directory matching a glob
+    COPY_FILE = "copy_file"        # copy a single file found by glob
+    RTREE_FIRST = "rmtree_first"   # delete the directory before copying
+
+
+@dataclass(frozen=True)
+class ResponsePattern:
+    """Locates the download URL inside the response used for version detection."""
+    kind: ResponseKind
+    pattern: str
+
+
+# Post-install actions (``AppSpec.post``). The engine dispatches on the type.
+@dataclass(frozen=True)
+class Kill:
+    """End a process by image name."""
+    image: str
+
+
+@dataclass(frozen=True)
+class KillTree:
+    """End a process together with the children it started."""
+    image: str
+
+
+@dataclass(frozen=True)
+class AddToPath:
+    """Append to the machine-wide PATH.
+
+    ``target`` is relative to the install directory; "" is the install
+    directory itself, and an absolute path is used as is.
+    """
+    target: str = ""
+
+
+@dataclass(frozen=True)
+class RemoveShortcut:
+    """Delete a shortcut from the desktop."""
+    name: str
+
+
+@dataclass(frozen=True)
+class DeleteRegistryKey:
+    key: str
+
+
+@dataclass(frozen=True)
+class OpenUrl:
+    """Open a page in the default browser.
+
+    "" falls back to ``RemoteInfo.extra["open_url"]``, which a remote hook
+    may have set.
+    """
+    url: str = ""
+
+
+@dataclass(frozen=True)
+class OpenInstallDir:
+    """Open the install directory in Explorer."""
+
+
+@dataclass(frozen=True)
+class CustomPost:
+    """Hook in the "post" group, called as ``fn(ctx, info)``."""
+    hook: str
+
+
+PostAction = (Kill | KillTree | AddToPath | RemoveShortcut | DeleteRegistryKey
+              | OpenUrl | OpenInstallDir | CustomPost)
+
+
 @dataclass(frozen=True)
 class LocalSpec:
     """How to read the installed version.
 
-    kind: exe | product | appx | file | command | glob | parts | mtime | custom
+    ``target`` is the file (or command) to read, ``pattern`` the regex or
+    format string the kind needs, ``custom`` the name of a "local" hook.
     """
-    kind: str = "exe"
+    kind: LocalKind = LocalKind.EXE
     target: str = ""
     pattern: str = ""
     custom: str = ""
@@ -138,14 +263,15 @@ class LocalSpec:
 class RemoteSpec:
     """How to resolve the newest version from a remote source.
 
-    kind: regex | json | redirect | findall_max | headless | custom
-    transform: "" | digits_dot | strip_last | groups_join | group_join
+    ``pattern`` is the regex (alternatives separated by ``||``), the JSON
+    path or the name of a custom hook's kind-specific argument;
+    ``transform`` post-processes the raw version string.
     """
     url: str = ""
-    kind: str = "regex"
+    kind: RemoteKind = RemoteKind.REGEX
     pattern: str = ""
     headers: Mapping[str, str] | None = None
-    transform: str = ""
+    transform: VersionTransform | None = None
     custom: str = ""
 
 
@@ -153,12 +279,12 @@ class RemoteSpec:
 class DownloadSpec:
     """Download URL resolution.
 
-    ``url`` may contain ``{version}``; ``from_response`` is a ``regex:...``
-    expression applied to the same response used for version detection;
-    ``custom`` names a function in :mod:`app.apps.hooks`.
+    ``url`` may contain ``{version}``; ``from_response`` locates the URL in
+    the same response that was used for version detection; ``custom`` names
+    a function in the application's "download" hooks.
     """
     url: str = ""
-    from_response: str = ""
+    from_response: ResponsePattern | None = None
     filename: str = ""
     custom: str = ""
 
@@ -167,12 +293,13 @@ class DownloadSpec:
 class InstallSpec:
     """How to apply a downloaded package.
 
-    kind: installer | extract | copy | desktop | manual | custom
-    mode: overwrite | copy_file | subdir | rmtree_first
+    ``args`` are the installer's command-line arguments; ``subdir`` is the
+    directory, glob or file name that ``DeployMode`` refers to; ``custom``
+    names an "install" hook.
     """
-    kind: str = "installer"
+    kind: InstallKind = InstallKind.INSTALLER
     args: str = ""
-    mode: str = "overwrite"
+    mode: DeployMode = DeployMode.OVERWRITE
     subdir: str = ""
     custom: str = ""
 
@@ -189,7 +316,7 @@ class AppSpec:
     remote: RemoteSpec | None = None
     download: DownloadSpec | None = None
     install: InstallSpec | None = None
-    post: tuple[str, ...] = ()
+    post: tuple[PostAction, ...] = ()
     manual_only: bool = False
     archive_handler: str = ""
     note: str = ""
@@ -207,7 +334,7 @@ class AppSpec:
         """Whether an unattended sweep may install this app without a prompt."""
         return (self.local is not None
                 and self.downloadable
-                and (self.install is None or self.install.kind != "manual"))
+                and (self.install is None or self.install.kind != InstallKind.MANUAL))
 
 
 @dataclass(frozen=True)

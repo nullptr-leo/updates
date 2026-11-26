@@ -24,7 +24,7 @@ from packaging import version as pkg_version
 from .atomic_io import rmtree_with_retry, temporary_workspace
 from .cancellation import CancellationToken
 from .config import Settings, UNRAR_DLL
-from .models import LocalSpec, NotInstalled, QueryFailed, TimedOut
+from .models import LocalKind, LocalSpec, NotInstalled, QueryFailed, TimedOut
 from .ports import CREATE_NO_WINDOW, ProcessPort, SubprocessPort
 
 try:
@@ -252,21 +252,21 @@ def get_local_version(local: LocalSpec | None, install_dir: str = "",
     if local is None:
         return ""
     kind = local.kind
-    if kind == "custom":
+    if kind == LocalKind.CUSTOM:
         fn = (hooks or {}).get(local.custom)
         if fn is None:
             raise QueryFailed(f"未注册的本地版本钩子: {local.custom}")
         return str(fn(ctx))
-    if kind == "exe":
+    if kind == LocalKind.EXE:
         return get_file_version(os.path.join(install_dir, local.target))
-    if kind == "product":
+    if kind == LocalKind.PRODUCT:
         return get_product_version(os.path.join(install_dir, local.target))
-    if kind == "appx":
+    if kind == LocalKind.APPX:
         return get_appx_version(local.target)
-    if kind == "parts":
+    if kind == LocalKind.PARTS:
         parts = get_file_version_parts(os.path.join(install_dir, local.target))
         return local.pattern % parts if local.pattern else "%d.%d.%d.%d" % parts
-    if kind == "file":
+    if kind == LocalKind.FILE:
         path = os.path.join(install_dir, local.target)
         if not os.path.isfile(path):
             raise NotInstalled(f"找不到版本文件: {path}")
@@ -275,7 +275,7 @@ def get_local_version(local: LocalSpec | None, install_dir: str = "",
         if not match:
             raise QueryFailed("版本文件解析失败")
         return match.group(1)
-    if kind == "command":
+    if kind == LocalKind.COMMAND:
         result = subprocess.run(
             shlex.split(local.target), stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL, timeout=20,
@@ -284,14 +284,14 @@ def get_local_version(local: LocalSpec | None, install_dir: str = "",
         text = result.stdout.decode("utf-8", errors="replace")
         match = re.search(local.pattern, text, flags=re.M) if local.pattern else None
         return match.group(1) if match else text.splitlines()[0] if text else ""
-    if kind == "glob":
+    if kind == LocalKind.GLOB:
         matches = glob.glob(os.path.join(install_dir, local.target))
         if not matches:
             raise NotInstalled(f"找不到版本文件: {local.target}")
         name = os.path.basename(matches[0])
         match = re.search(local.pattern, name) if local.pattern else None
         return match.group(1) if match else name
-    if kind == "mtime":
+    if kind == LocalKind.MTIME:
         path = os.path.join(install_dir, local.target)
         if not os.path.isfile(path):
             raise NotInstalled(f"找不到主程序: {path}")

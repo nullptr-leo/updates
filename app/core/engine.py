@@ -21,8 +21,11 @@ from .cancellation import CancellationToken
 from .config import Settings, download_dir
 from .logging_setup import get_logger
 from .models import (
-    AppSpec, Cancelled, ErrorInfo, InstallSpec, LogLevel, Mode, NotInstalled,
-    Phase, ProgressEvent, QueryFailed, RemoteInfo, RemoteSpec,
+    AddToPath, AppSpec, Cancelled, CustomPost, DeleteRegistryKey, DeployMode,
+    ErrorInfo, InstallKind, InstallSpec, Kill, KillTree, LogLevel, Mode,
+    NotInstalled, OpenInstallDir, OpenUrl, Phase, ProgressEvent, QueryFailed,
+    RemoteInfo, RemoteKind, RemoteSpec, RemoveShortcut, ResponseKind,
+    VersionTransform,
 )
 from .ports import ProcessPort, SubprocessPort
 
@@ -37,13 +40,20 @@ NETWORK_ATTEMPTS = 3
 INSTALL_SUCCESS_CODES = frozenset({0, 1641, 3010})
 
 
-def _transform(raw: str, transform: str) -> str:
-    if transform == "digits_dot":
-        return ".".join(raw)
-    if transform == "strip_last":
-        parts = raw.split(".")
-        return ".".join(parts[:-1]) if len(parts) > 1 else raw
-    return raw
+def _strip_last(version: str) -> str:
+    parts = version.split(".")
+    return ".".join(parts[:-1]) if len(parts) > 1 else version
+
+
+# Post-processing of a raw version string, by VersionTransform.
+_TRANSFORMS: dict[VersionTransform, Callable[[str], str]] = {
+    VersionTransform.DIGITS_DOT: lambda raw: ".".join(raw),
+    VersionTransform.STRIP_LAST: _strip_last,
+}
+
+
+def _transform(raw: str, transform: VersionTransform | None) -> str:
+    return _TRANSFORMS[transform](raw) if transform is not None else raw
 
 
 def _json_path(text: str, path: str) -> Any:
@@ -181,7 +191,7 @@ class UpdateEngine:
         for ext in (".msixbundle", ".zip", ".7z", ".rar", ".exe", ".msi"):
             if ext in url.lower():
                 return ext
-        return ".exe" if spec.install and spec.install.kind == "installer" else ".zip"
+        return ".exe" if spec.install and spec.install.kind == InstallKind.INSTALLER else ".zip"
 
     # ------------------------------------------------------------------
     # pipeline stages
@@ -201,28 +211,28 @@ class UpdateEngine:
         remote: RemoteSpec | None = spec.remote
         if remote is None:
             return RemoteInfo()
-        if remote.kind == "custom":
+        if remote.kind == RemoteKind.CUSTOM:
             result = self._hook("remote", remote.custom)(ctx)
             return result if isinstance(result, RemoteInfo) else RemoteInfo(version=str(result))
-        if remote.kind == "redirect":
+        if remote.kind == RemoteKind.REDIRECT:
             final = self.http.final_url(
                 remote.url, settings=self.settings, spec=spec)
             return RemoteInfo(version=self._extract_version(remote, final),
                               url=final, text=final)
-        if remote.kind == "headless":
+        if remote.kind == RemoteKind.HEADLESS:
             text = services.query_rendered(remote.url)
         else:
             text = self.http.get_text(
                 remote.url, settings=self.settings, spec=spec,
                 headers=dict(remote.headers or {}),
             )
-        if remote.kind == "findall_max":
+        if remote.kind == RemoteKind.FINDALL_MAX:
             found = [v if isinstance(v, str) else (v or "0")
                      for v in re.findall(remote.pattern, text, flags=re.M)]
             if not found:
                 raise QueryFailed("未在页面找到版本号")
             return RemoteInfo(version=_max_version(found), text=text)
-        if remote.kind == "json":
+        if remote.kind == RemoteKind.JSON:
             value = _json_path(text, remote.pattern)
             return RemoteInfo(version=_transform(str(value), remote.transform), text=text)
         return RemoteInfo(version=self._extract_version(remote, text), text=text)
@@ -234,7 +244,7 @@ class UpdateEngine:
             try:
                 for match in re.finditer(pattern, text, flags=re.M | re.I):
                     groups = match.groups()
-                    if remote.transform == "groups_join":
+                    if remote.transform == VersionTransform.GROUPS_JOIN:
                         value = "".join(g or "" for g in groups[1:])
                     else:
                         raw = (groups[0] or "") if groups else match.group(0)
@@ -251,14 +261,14 @@ class UpdateEngine:
             return info.url
         if dl.custom:
             return str(self._hook("download", dl.custom)(ctx, info))
-        if dl.from_response:
-            kind, _, pattern = dl.from_response.partition(":")
-            if kind == "regex":
-                match = re.search(pattern, info.text, flags=re.M)
+        if dl.from_response is not None:
+            source = dl.from_response
+            if source.kind == ResponseKind.REGEX:
+                match = re.search(source.pattern, info.text, flags=re.M)
                 if match:
                     return match.group(1) if match.groups() else match.group(0)
-            elif kind == "json":
-                return str(_json_path(info.text, pattern))
+            else:
+                return str(_json_path(info.text, source.pattern))
             raise QueryFailed("下载地址解析失败")
         if dl.url == "{remote_url}":
             return info.url
@@ -296,12 +306,12 @@ class UpdateEngine:
 
     @staticmethod
     def _extract_source(root: str, inst: InstallSpec) -> str:
-        if inst.mode in ("subdir_glob", "subdir"):
+        if inst.mode in (DeployMode.SUBDIR_GLOB, DeployMode.SUBDIR):
             found = [p for p in glob.glob(os.path.join(root, inst.subdir))
                      if os.path.isdir(p)]
             if found:
                 return found[0]
-        if inst.mode == "copy_file":
+        if inst.mode == DeployMode.COPY_FILE:
             found = glob.glob(os.path.join(root, "**", inst.subdir), recursive=True)
             if found:
                 return found[0]
@@ -311,11 +321,10 @@ class UpdateEngine:
     def _close_running(spec: AppSpec) -> None:
         """Close the app before overwriting its files (post-install kill is too late)."""
         for action in spec.post:
-            head, _, value = action.partition(":")
-            if head == "taskkill" and value:
-                services.kill_process(value)
-            elif head == "taskkilltree" and value:
-                services.kill_process(value, tree=True)
+            if isinstance(action, Kill) and action.image:
+                services.kill_process(action.image)
+            elif isinstance(action, KillTree) and action.image:
+                services.kill_process(action.image, tree=True)
 
     @staticmethod
     def _retry_on_lock(operation: Callable[[], None],
@@ -341,19 +350,19 @@ class UpdateEngine:
     def _install(self, spec: AppSpec, dest: str, info: RemoteInfo,
                  ctx: Context, token: CancellationToken) -> None:
         inst: InstallSpec | None = spec.install
-        if inst is None or inst.kind == "manual":
+        if inst is None or inst.kind == InstallKind.MANUAL:
             return
         self._close_running(spec)
-        if inst.kind == "custom":
+        if inst.kind == InstallKind.CUSTOM:
             self._hook("install", inst.custom)(ctx, info, dest)
             return
-        if inst.kind == "desktop":
+        if inst.kind == InstallKind.DESKTOP:
             filename = (spec.download.filename if spec.download and spec.download.filename
                         else f"{info.version}{self._extension(dest, spec)}")
             os.makedirs(services.desktop_dir(), exist_ok=True)
             shutil.copy2(dest, os.path.join(services.desktop_dir(), filename))
             return
-        if inst.kind == "installer":
+        if inst.kind == InstallKind.INSTALLER:
             args = [dest] + shlex.split(inst.args)
             code = services.run_process(
                 args, port=self.port, token=token,
@@ -367,7 +376,7 @@ class UpdateEngine:
                 self.log.info("[%s] 安装程序退出码 %s（需要重启）", spec.id, code)
                 self._send(spec, Phase.INSTALLING, message="安装完成，需要重启电脑")
             return
-        if inst.kind == "copy":
+        if inst.kind == InstallKind.COPY:
             target_dir = ctx.install_dir(create=True)
             target = os.path.join(target_dir, inst.subdir)
             for attempt in range(3):
@@ -380,15 +389,15 @@ class UpdateEngine:
                     services.kill_process(os.path.basename(target))
                     time.sleep(0.5)
             return
-        if inst.kind == "extract":
+        if inst.kind == InstallKind.EXTRACT:
             target_dir = ctx.install_dir(create=True)
             unlock = lambda: self._close_running(spec)
             with temporary_workspace(prefix="us-extract-") as tmp:
                 services.extract_archive(dest, tmp, settings=self.settings)
                 source = self._extract_source(tmp, inst)
-                if inst.mode == "rmtree_first":
+                if inst.mode == DeployMode.RTREE_FIRST:
                     shutil.rmtree(target_dir, ignore_errors=True)
-                if inst.mode == "copy_file":
+                if inst.mode == DeployMode.COPY_FILE:
                     name = (os.path.basename(source)
                             if any(c in inst.subdir for c in "*?")
                             else inst.subdir)
@@ -405,39 +414,14 @@ class UpdateEngine:
               token: CancellationToken) -> None:
         for action in spec.post:
             token.raise_if_cancelled()
-            head, _, value = action.partition(":")
-            if head == "taskkill":
-                services.kill_process(value)
-            elif head == "taskkilltree":
-                services.kill_process(value, tree=True)
-            elif head == "path":
-                base = ctx.install_dir() if spec.install_dirs else ""
-                if value in ("", "self", "."):
-                    path = base
-                elif os.path.isabs(value):
-                    path = value
-                else:
-                    path = os.path.join(base, value)
-                services.append_env_var("PATH", [path])
-            elif head == "shortcut":
-                services.remove_desktop_shortcut(value)
-            elif head == "regdel":
-                services.delete_registry_key(value)
-            elif head == "open_url":
-                services.open_url(value or info.extra.get("open_url", ""))
-            elif head == "open_explorer":
-                if spec.install_dirs:
-                    try:
-                        services.open_explorer(ctx.install_dir())
-                    except NotInstalled:
-                        pass
-            elif head == "custom":
-                self._hook("post", value)(ctx, info)
+            handler = _POST_HANDLERS.get(type(action))
+            if handler is not None:
+                handler(self, action, spec, info, ctx)
 
     def _manual(self, spec: AppSpec, info: RemoteInfo, ctx: Context,
                 token: CancellationToken) -> None:
         self._post(spec, info, ctx, token)
-        if not any(a.startswith("open_url") for a in spec.post):
+        if not any(isinstance(action, OpenUrl) for action in spec.post):
             services.open_url(spec.homepage)
 
     def _finish_error(self, spec: AppSpec, phase: Phase, exc: BaseException,
@@ -562,7 +546,7 @@ class UpdateEngine:
                                remote_version=remote, needs_update=False,
                                finished=True)
                     return
-                if spec.manual_only or (spec.install and spec.install.kind == "manual"):
+                if spec.manual_only or (spec.install and spec.install.kind == InstallKind.MANUAL):
                     self._manual(spec, info, ctx, token)
                     self._send(spec, Phase.MANUAL, message="已打开下载页面",
                                local_version=local, remote_version=remote,
@@ -629,6 +613,79 @@ class UpdateEngine:
                     continue
                 self._finish_error(spec, Phase.FAILED, exc, local, remote)
                 return
+
+
+# --------------------------------------------------------------------------
+# post-install actions, dispatched by the action's type
+# --------------------------------------------------------------------------
+PostHandler = Callable[["UpdateEngine", Any, AppSpec, RemoteInfo, Context], None]
+
+
+def _post_kill(engine: UpdateEngine, action: Kill, spec: AppSpec,
+               info: RemoteInfo, ctx: Context) -> None:
+    if action.image:
+        services.kill_process(action.image)
+
+
+def _post_kill_tree(engine: UpdateEngine, action: KillTree, spec: AppSpec,
+                    info: RemoteInfo, ctx: Context) -> None:
+    if action.image:
+        services.kill_process(action.image, tree=True)
+
+
+def _post_add_to_path(engine: UpdateEngine, action: AddToPath, spec: AppSpec,
+                      info: RemoteInfo, ctx: Context) -> None:
+    base = ctx.install_dir() if spec.install_dirs else ""
+    if action.target in ("", "self", "."):
+        path = base
+    elif os.path.isabs(action.target):
+        path = action.target
+    else:
+        path = os.path.join(base, action.target)
+    services.append_env_var("PATH", [path])
+
+
+def _post_remove_shortcut(engine: UpdateEngine, action: RemoveShortcut,
+                          spec: AppSpec, info: RemoteInfo, ctx: Context) -> None:
+    services.remove_desktop_shortcut(action.name)
+
+
+def _post_delete_registry_key(engine: UpdateEngine, action: DeleteRegistryKey,
+                              spec: AppSpec, info: RemoteInfo,
+                              ctx: Context) -> None:
+    services.delete_registry_key(action.key)
+
+
+def _post_open_url(engine: UpdateEngine, action: OpenUrl, spec: AppSpec,
+                   info: RemoteInfo, ctx: Context) -> None:
+    services.open_url(action.url or info.extra.get("open_url", ""))
+
+
+def _post_open_install_dir(engine: UpdateEngine, action: OpenInstallDir,
+                           spec: AppSpec, info: RemoteInfo,
+                           ctx: Context) -> None:
+    if spec.install_dirs:
+        try:
+            services.open_explorer(ctx.install_dir())
+        except NotInstalled:
+            pass
+
+
+def _post_custom(engine: UpdateEngine, action: CustomPost, spec: AppSpec,
+                 info: RemoteInfo, ctx: Context) -> None:
+    engine._hook("post", action.hook)(ctx, info)
+
+
+_POST_HANDLERS: dict[type, PostHandler] = {
+    Kill: _post_kill,
+    KillTree: _post_kill_tree,
+    AddToPath: _post_add_to_path,
+    RemoveShortcut: _post_remove_shortcut,
+    DeleteRegistryKey: _post_delete_registry_key,
+    OpenUrl: _post_open_url,
+    OpenInstallDir: _post_open_install_dir,
+    CustomPost: _post_custom,
+}
 
 
 def _max_version(values: list[str]) -> str:
