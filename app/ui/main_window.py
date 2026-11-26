@@ -194,8 +194,6 @@ class MainWindow(QMainWindow):
         self.settings = settings
         self.version_text = version_text
         self._force_quit = False
-        self._done = 0
-        self._total = 0
         self._taskbar = _TaskbarProgress()
         self._columns_tuned = False
         self._restoring_sort = False
@@ -206,6 +204,7 @@ class MainWindow(QMainWindow):
 
         self.pool = TaskPool(settings, hooks=HOOKS, port=QProcessPort(), parent=self)
         self.pool.event.connect(self._on_event)
+        self.pool.taskFinished.connect(lambda _app_id: self._update_activity())
         self.pool.idle.connect(self._on_idle)
 
         self.model = AppTableModel(visible_specs(settings), self)
@@ -417,12 +416,7 @@ class MainWindow(QMainWindow):
             + ("…" if len(targets) > 8 else ""),
             level=LogLevel.DEBUG,
         )
-        submitted = self.pool.submit(targets, mode)
-        if submitted:
-            if self._total and self._done >= self._total:
-                self._done = 0
-                self._total = 0
-            self._total += submitted
+        self.pool.submit(targets, mode)
         self._update_activity()
         return True
 
@@ -457,11 +451,9 @@ class MainWindow(QMainWindow):
         index = self.model.index_of(ev.app_id)
         if index >= 0:
             self.detail.set_row(self.model.row_at(index))
-        if ev.finished:
-            self._done += 1
-            if ev.error:
-                self.statusBar().showMessage(
-                    f"{ev.app_id}: {ev.error.message}", 8000)
+        if ev.finished and ev.error:
+            self.statusBar().showMessage(
+                f"{ev.app_id}: {ev.error.message}", 8000)
         self._update_stats()
         if ev.phase == Phase.WAITING_NETWORK:
             self.statusBar().showMessage(ev.message or "网络未连接，任务等待连接…")
@@ -469,7 +461,8 @@ class MainWindow(QMainWindow):
 
     def _on_idle(self) -> None:
         self._set_busy(False)
-        self.activity.append_line(f"任务进度（{self._done}/{self._total}）",
+        done, total = self.pool.progress()
+        self.activity.append_line(f"任务进度（{done}/{total}）",
                                   level=LogLevel.DEBUG)
         self.statusBar().showMessage("任务结束")
         self._update_activity()
@@ -735,9 +728,10 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"上次更新：{cache.last_update_time()}")
 
     def _update_activity(self) -> None:
-        self.activity.set_progress(self._done, self._total)
-        if self._total:
-            self._taskbar.set_progress(int(self.winId()), self._done, self._total)
+        done, total = self.pool.progress()
+        self.activity.set_progress(done, total)
+        if total:
+            self._taskbar.set_progress(int(self.winId()), done, total)
 
     # ------------------------------------------------------ tray / schedule
     def restore_from_tray(self) -> None:
