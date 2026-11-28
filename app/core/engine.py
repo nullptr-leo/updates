@@ -207,6 +207,13 @@ class UpdateEngine:
             hooks=self.hooks.get("local", {}), ctx=ctx,
         )
 
+    def installed_version(self, spec: AppSpec) -> str:
+        """Version currently on disk, "" when it cannot be read."""
+        try:
+            return self._local_version(spec, Mode.CHECK, Context(self, spec, CancellationToken()))
+        except Exception:
+            return ""
+
     def _remote_info(self, spec: AppSpec, ctx: Context) -> RemoteInfo:
         remote: RemoteSpec | None = spec.remote
         if remote is None:

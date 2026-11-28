@@ -24,7 +24,9 @@ from packaging import version as pkg_version
 from .atomic_io import rmtree_with_retry, temporary_workspace
 from .cancellation import CancellationToken
 from .config import Settings, UNRAR_DLL
-from .models import LocalKind, LocalSpec, NotInstalled, QueryFailed, TimedOut
+from .models import (
+    AppSpec, LocalKind, LocalSpec, NotInstalled, QueryFailed, TimedOut,
+)
 from .ports import CREATE_NO_WINDOW, ProcessPort, SubprocessPort
 
 try:
@@ -179,6 +181,21 @@ def find_install_dir(names: str | Sequence[str], settings: Settings | None = Non
         os.makedirs(path, exist_ok=True)
         return path
     raise NotInstalled("未安装: " + ", ".join(names))
+
+
+def program_path(spec: AppSpec, settings: Settings | None = None) -> str:
+    """Path of the app's main executable, or its directory when the recipe
+    does not name one. "" when the app is not installed."""
+    if not spec.install_dirs:
+        return ""
+    try:
+        root = find_install_dir(spec.install_dirs, settings)
+    except Exception:
+        return ""
+    if spec.local and spec.local.kind in (LocalKind.EXE, LocalKind.PARTS,
+                                          LocalKind.MTIME):
+        return os.path.join(root, spec.local.target)
+    return root
 
 
 def get_file_version_parts(exe_path: str) -> tuple[int, int, int, int]:

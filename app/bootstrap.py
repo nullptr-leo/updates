@@ -113,15 +113,14 @@ def run(argv: list[str] | None = None) -> int:
     if argv and argv[0] == "--cli":
         return run_cli(argv)
 
-    from PySide6.QtCore import Qt
-    from PySide6.QtGui import QGuiApplication, QIcon
+    from PySide6.QtGui import QIcon
     from PySide6.QtNetwork import QLocalServer
     from PySide6.QtWidgets import QApplication
     from . import __version__
     from .core.config import ICON_PATH
     from .core.logging_setup import get_logger
     from .ui.main_window import MainWindow
-    from .ui.theme import stylesheet
+    from .ui.theme import apply_theme
 
     app = QApplication(sys.argv)
     app.setApplicationName("Update Scripts")
@@ -139,14 +138,7 @@ def run(argv: list[str] | None = None) -> int:
         server.listen(INSTANCE_KEY)
 
     settings = load_settings()
-    theme = settings.theme
-    if theme == "system":
-        try:
-            theme = ("dark" if QGuiApplication.styleHints().colorScheme()
-                     == Qt.ColorScheme.Dark else "light")
-        except Exception:
-            theme = "light"
-    app.setStyleSheet(stylesheet(theme))
+    apply_theme(app, settings.theme)
     if ICON_PATH.exists():
         app.setWindowIcon(QIcon(str(ICON_PATH)))
 

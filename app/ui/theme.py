@@ -1,5 +1,10 @@
 """Two compact QSS themes. No third-party widget library required."""
 
+from __future__ import annotations
+
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QGuiApplication
+
 from ..core.config import ASSETS_DIR
 
 LIGHT_QSS = """
@@ -140,3 +145,21 @@ QSpinBox::down-arrow {{ image: url("{down}"); }}
 
 def palette(theme: str) -> dict[str, str]:
     return PALETTE["dark" if theme == "dark" else "light"]
+
+
+def resolve(theme: str) -> str:
+    """"system" resolves to the scheme Qt reports; any other name is used as is."""
+    if theme != "system":
+        return theme
+    try:
+        scheme = QGuiApplication.styleHints().colorScheme()
+        return "dark" if scheme == Qt.ColorScheme.Dark else "light"
+    except Exception:
+        return "light"
+
+
+def apply_theme(app, theme: str) -> dict[str, str]:
+    """Set the application stylesheet for ``theme`` and return its palette."""
+    resolved = resolve(theme)
+    app.setStyleSheet(stylesheet(resolved))
+    return palette(resolved)
